@@ -187,7 +187,24 @@ export function A2UISurface({
     }
 
     return (
-      <div className={className}>
+      <div 
+        className={className}
+        style={{
+          animation: 'fadeInUp 0.4s ease-out',
+        }}
+      >
+        <style jsx>{`
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}</style>
         {renderNode(rootNode, surface, handleAction)}
       </div>
     );

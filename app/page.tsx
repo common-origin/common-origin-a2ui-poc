@@ -22,6 +22,20 @@ const PageContainer = styled.div`
   min-height: 100vh;
   padding: 2rem;
   background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+  animation: fadeIn 0.5s ease;
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    padding: 1rem;
+  }
 `;
 
 const Header = styled.header`
@@ -35,12 +49,21 @@ const Title = styled.h1`
   font-weight: 700;
   margin-bottom: 0.5rem;
   color: #212529;
+  
+  @media (max-width: 768px) {
+    font-size: 1.75rem;
+  }
 `;
 
 const Subtitle = styled.p`
   font-size: 1.125rem;
   color: #6c757d;
   margin-bottom: 2rem;
+  
+  @media (max-width: 768px) {
+    font-size: 1rem;
+    margin-bottom: 1.5rem;
+  }
 `;
 
 const ControlPanel = styled.div`
@@ -48,6 +71,12 @@ const ControlPanel = styled.div`
   gap: 1rem;
   justify-content: center;
   margin-bottom: 2rem;
+  flex-wrap: wrap;
+  
+  @media (max-width: 768px) {
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
 `;
 
 const Button = styled.button<{ variant?: 'primary' | 'secondary' }>`
@@ -68,6 +97,11 @@ const Button = styled.button<{ variant?: 'primary' | 'secondary' }>`
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
     }
+    
+    &:focus-visible {
+      outline: 3px solid #0d6efd;
+      outline-offset: 2px;
+    }
   ` : `
     background: white;
     color: #212529;
@@ -76,6 +110,11 @@ const Button = styled.button<{ variant?: 'primary' | 'secondary' }>`
     &:hover:not(:disabled) {
       background: #f8f9fa;
       border-color: #adb5bd;
+    }
+    
+    &:focus-visible {
+      outline: 3px solid #0d6efd;
+      outline-offset: 2px;
     }
   `}
   
@@ -97,6 +136,17 @@ const SurfaceContainer = styled.div`
   padding: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   min-height: 400px;
+  transition: box-shadow 0.3s ease;
+  
+  &:hover {
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  @media (max-width: 768px) {
+    padding: 1rem;
+    border-radius: 0.75rem;
+    min-height: 300px;
+  }
 `;
 
 const InfoBanner = styled.div`
@@ -132,6 +182,19 @@ const StatusIndicator = styled.div<{ $isGenerating: boolean }>`
   font-size: 0.875rem;
   font-weight: 600;
   margin-bottom: 1rem;
+  transition: all 0.3s ease;
+  animation: slideDown 0.3s ease;
+  
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
   
   &::before {
     content: '';
@@ -158,6 +221,13 @@ const QueryInputContainer = styled.div`
   display: flex;
   gap: 0.75rem;
   align-items: flex-end;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
 `;
 
 const QueryInput = styled.input`
@@ -172,6 +242,7 @@ const QueryInput = styled.input`
   &:focus {
     outline: none;
     border-color: #0d6efd;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
   }
 
   &:disabled {
@@ -191,6 +262,10 @@ const ExampleChips = styled.div`
   gap: 0.5rem;
   flex-wrap: wrap;
   justify-content: center;
+  
+  @media (max-width: 768px) {
+    gap: 0.375rem;
+  }
 `;
 
 const ExampleChip = styled.button`
@@ -208,10 +283,20 @@ const ExampleChip = styled.button`
     border-color: #0d6efd;
     color: #0d6efd;
   }
+  
+  &:focus-visible {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+  }
 
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+  
+  @media (max-width: 768px) {
+    padding: 0.25rem 0.625rem;
+    font-size: 0.8125rem;
   }
 `;
 
@@ -304,7 +389,7 @@ export default function Home() {
 
   return (
     <PageContainer>
-      <Header>
+      <Header role="banner">
         <Title>A2UI + Common Origin Demo</Title>
         <Subtitle>
           Agent-generated UI rendered through a trusted component catalog
@@ -318,28 +403,31 @@ export default function Home() {
         consistent design.
       </InfoBanner>
 
-      <ExampleChips>
+      <ExampleChips role="group" aria-label="Example queries">
         <ExampleChip
           onClick={() => handleExampleClick('Find my Starbucks transactions')}
           disabled={isGenerating}
+          aria-label="Find my Starbucks transactions"
         >
           🔍 Find transactions
         </ExampleChip>
         <ExampleChip
           onClick={() => handleExampleClick('Show spending summary')}
           disabled={isGenerating}
+          aria-label="Show spending summary"
         >
           📊 Spending summary
         </ExampleChip>
         <ExampleChip
           onClick={() => handleExampleClick('Transfer $100 to savings')}
           disabled={isGenerating}
+          aria-label="Transfer $100 to savings"
         >
           💸 Transfer money
         </ExampleChip>
       </ExampleChips>
 
-      <QueryInputContainer>
+      <QueryInputContainer role="search" aria-label="Banking query search">
         <QueryInput
           type="text"
           placeholder="Ask me about transactions, spending, or transfers..."
@@ -347,19 +435,27 @@ export default function Home() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyPress={handleKeyPress}
           disabled={isGenerating}
+          aria-label="Banking query input"
+          aria-describedby="query-help"
         />
         <Button
           variant="primary"
           onClick={() => handleSubmit()}
           disabled={isGenerating || !query.trim()}
+          aria-label={isGenerating ? 'Generating UI' : 'Submit query'}
         >
           {isGenerating ? 'Generating...' : 'Submit'}
         </Button>
       </QueryInputContainer>
 
-      <SurfaceContainer>
+      <SurfaceContainer role="main" aria-label="Generated UI content">
         {(isGenerating || hasGenerated) && (
-          <StatusIndicator $isGenerating={isGenerating}>
+          <StatusIndicator 
+            $isGenerating={isGenerating}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             {isGenerating ? 'Agent streaming UI updates...' : 'UI generation complete'}
           </StatusIndicator>
         )}
