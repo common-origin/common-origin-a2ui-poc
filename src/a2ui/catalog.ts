@@ -98,8 +98,7 @@ export function renderNode(
     
     return React.createElement(
       Typography,
-      { key: node.id, variant },
-      content
+      { key: node.id, variant, children: content }
     );
   }
 
@@ -115,8 +114,8 @@ export function renderNode(
         size,
         disabled,
         onClick: action ? () => onAction?.(action) : undefined,
-      },
-      content
+        children: content,
+      }
     );
   }
 
@@ -224,7 +223,7 @@ export function renderNode(
         excerpt: excerptText,
         subtitle: subtitleText,
         labels,
-        onClick: onClick ? () => onAction?.(onClick) : undefined,
+        picture: '', // Required by CardLarge
       }
     );
   }
@@ -238,8 +237,8 @@ export function renderNode(
         key: node.id,
         dividers,
         spacing,
-      },
-      ...childElements
+        children: childElements,
+      }
     );
   }
 
@@ -279,8 +278,8 @@ export function renderNode(
         key: node.id,
         direction,
         gap,
-      },
-      ...childElements
+        children: childElements,
+      }
     );
   }
 
@@ -295,8 +294,8 @@ export function renderNode(
         key: node.id,
         variant,
         title: titleText || '',
-      },
-      contentText
+        children: contentText,
+      }
     );
   }
 
@@ -320,13 +319,19 @@ export function renderNode(
     const labelText = resolveDataBinding(label, surface.dataModel);
     const valueText = value ? resolveDataBinding(value, surface.dataModel) : undefined;
     
+    // Map options to include required 'id' field
+    const mappedOptions = options.map(opt => ({
+      id: opt.value,
+      value: opt.value,
+      label: opt.label,
+    }));
+    
     return React.createElement(Dropdown, {
       key: node.id,
       label: labelText,
       value: valueText || '',
-      options: options,
+      options: mappedOptions,
       placeholder: placeholder || 'Select...',
-      required,
       disabled,
       onChange: onChange ? (selectedValue: string) => {
         const action = {
@@ -335,7 +340,7 @@ export function renderNode(
           updateDataModel: onChange.dataPath ? { [onChange.dataPath]: selectedValue } : undefined,
         };
         onAction?.(action);
-      } : undefined,
+      } : () => {},
     });
   }
 
@@ -384,7 +389,8 @@ export function renderNode(
       label: labelText,
       checked,
       disabled,
-      onChange: onChange ? (isChecked: boolean) => {
+      onChange: onChange ? (event: React.ChangeEvent<HTMLInputElement>) => {
+        const isChecked = event.target.checked;
         const action = {
           ...onChange,
           value: isChecked,
@@ -404,10 +410,10 @@ export function renderNode(
       {
         key: node.id,
         title: titleText,
-        open,
-        onClose: onClose ? () => onAction?.(onClose) : undefined,
-      },
-      ...childElements
+        isOpen: open,
+        onClose: onClose ? () => onAction?.(onClose) : () => {},
+        children: childElements,
+      }
     );
   }
 
@@ -419,10 +425,9 @@ export function renderNode(
       return React.createElement(
         'div',
         { key: node.id, style: { width: '100%' } },
-        labelText && React.createElement(Typography, { variant: 'caption' }, labelText),
+        labelText && React.createElement(Typography, { variant: 'caption', children: labelText }),
         React.createElement(ProgressBar, {
           value,
-          size,
         })
       );
     }
@@ -430,7 +435,6 @@ export function renderNode(
     return React.createElement(ProgressBar, {
       key: node.id,
       value,
-      size,
     });
   }
 
