@@ -138,8 +138,8 @@ const StatusIndicator = styled.div<{ $isGenerating: boolean }>`
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: ${props => props.isGenerating ? '#ffc107' : '#198754'};
-    animation: ${props => props.isGenerating ? 'pulse 1.5s ease-in-out infinite' : 'none'};
+    background: ${props => props.$isGenerating ? '#ffc107' : '#198754'};
+    animation: ${props => props.$isGenerating ? 'pulse 1.5s ease-in-out infinite' : 'none'};
   }
   
   @keyframes pulse {
