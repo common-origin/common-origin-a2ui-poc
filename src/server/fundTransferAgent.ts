@@ -11,12 +11,12 @@
 import type { A2UIMessage } from '../a2ui/types';
 
 /**
- * Mock account data
+ * Mock account data - Australian bank accounts
  */
 const ACCOUNTS = [
-  { value: 'checking', label: 'Checking Account (•••• 4532) - $5,280.42' },
+  { value: 'transaction', label: 'Transaction Account (•••• 4532) - $5,280.42' },
   { value: 'savings', label: 'Savings Account (•••• 8291) - $12,450.00' },
-  { value: 'money-market', label: 'Money Market (•••• 1847) - $25,000.00' },
+  { value: 'offset', label: 'Offset Account (•••• 1847) - $25,000.00' },
 ];
 
 /**

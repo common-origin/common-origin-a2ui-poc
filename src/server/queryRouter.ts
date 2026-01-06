@@ -49,12 +49,13 @@ export function analyzeQuery(query: string): QueryAnalysis {
 
   // Fund transfer patterns
   const transferPatterns = [
-    /transfer.*money/i,
+    /transfer/i,  // Match any mention of "transfer"
     /send.*money/i,
     /move.*money/i,
-    /transfer.*fund/i,
+    /move.*fund/i,
     /pay.*from/i,
     /transfer.*\$\d+/i,
+    /send.*\$\d+/i,
   ];
 
   // Check for empty state keywords

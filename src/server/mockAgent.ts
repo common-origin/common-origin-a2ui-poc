@@ -14,40 +14,40 @@
 import type { A2UIMessage } from '../a2ui/types';
 
 /**
- * Transaction data for demo
+ * Transaction data for demo - Australian retailers
  */
 const MOCK_TRANSACTIONS = [
   {
     id: 'tx1',
-    merchant: 'Whole Foods Market',
+    merchant: 'Woolworths',
     date: '2025-12-15',
     amount: -87.43,
     category: 'Groceries',
   },
   {
     id: 'tx2',
-    merchant: 'Shell Gas Station',
+    merchant: 'Caltex',
     date: '2025-12-14',
     amount: -52.00,
     category: 'Transportation',
   },
   {
     id: 'tx3',
-    merchant: 'Netflix',
+    merchant: 'Netflix Australia',
     date: '2025-12-13',
     amount: -15.99,
     category: 'Entertainment',
   },
   {
     id: 'tx4',
-    merchant: 'Starbucks',
+    merchant: 'The Coffee Club',
     date: '2025-12-12',
     amount: -6.75,
     category: 'Food & Drink',
   },
   {
     id: 'tx5',
-    merchant: 'Amazon',
+    merchant: 'Kmart',
     date: '2025-12-11',
     amount: -42.36,
     category: 'Shopping',
@@ -229,10 +229,18 @@ function generateResultsSectionMessages(): A2UIMessage[] {
         date: { literalString: tx.date },
         status: 'completed' as const,
         category: categoryMap[tx.category] || 'other',
-        currency: 'USD',
+        currency: 'AUD',
       },
     },
   }));
+
+  // Get today's and yesterday's dates in ISO format
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const todayISO = today.toISOString().split('T')[0];
+  const yesterdayISO = yesterday.toISOString().split('T')[0];
 
   return [
     {
@@ -263,11 +271,11 @@ function generateResultsSectionMessages(): A2UIMessage[] {
             id: 'date-group-today',
             component: {
               DateGroup: {
-                date: { literalString: 'Today' },
+                date: { literalString: todayISO },
                 format: 'relative',
                 showCount: true,
                 count: 2,
-                currency: 'USD',
+                currency: 'AUD',
               },
             },
             children: ['tx-item-0', 'tx-item-1'],
@@ -277,11 +285,11 @@ function generateResultsSectionMessages(): A2UIMessage[] {
             id: 'date-group-yesterday',
             component: {
               DateGroup: {
-                date: { literalString: 'Yesterday' },
+                date: { literalString: yesterdayISO },
                 format: 'relative',
                 showCount: true,
                 count: 3,
-                currency: 'USD',
+                currency: 'AUD',
               },
             },
             children: ['tx-item-2', 'tx-item-3', 'tx-item-4'],

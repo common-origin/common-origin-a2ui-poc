@@ -11,7 +11,7 @@
 import type { A2UIMessage } from '../a2ui/types';
 
 /**
- * Spending data by category
+ * Spending data by category - Australian context
  */
 const SPENDING_DATA = [
   {
@@ -22,7 +22,7 @@ const SPENDING_DATA = [
     transactions: 12,
   },
   {
-    category: 'Transportation',
+    category: 'Transport',
     amount: 342.50,
     percentage: 20,
     trend: 'down',
@@ -36,7 +36,7 @@ const SPENDING_DATA = [
     transactions: 6,
   },
   {
-    category: 'Food & Drink',
+    category: 'Dining',
     amount: 389.45,
     percentage: 23,
     trend: 'up',
@@ -124,7 +124,7 @@ export function getSpendingSummaryMessages(): A2UIMessage[] {
             component: {
               MoneyDisplay: {
                 amount: -TOTAL_SPENDING,
-                currency: 'USD',
+                currency: 'AUD',
                 variant: 'negative',
                 size: 'xlarge',
                 weight: 'bold',
@@ -206,7 +206,7 @@ export function getSpendingSummaryMessages(): A2UIMessage[] {
             component: {
               MoneyDisplay: {
                 amount: -cat.amount,
-                currency: 'USD',
+                currency: 'AUD',
                 variant: 'negative',
                 size: 'medium',
                 weight: 'bold',
