@@ -86,7 +86,7 @@ export function getSpendingSummaryMessages(): A2UIMessage[] {
             id: 'header',
             component: {
               Text: {
-                text: { literalString: 'Spending Summary' },
+                text: { literalString: 'Spending summary' },
                 variant: 'h1',
               },
             },
@@ -95,7 +95,7 @@ export function getSpendingSummaryMessages(): A2UIMessage[] {
       },
     },
 
-    // Total spending card
+    // Total spending card - use MoneyDisplay instead of formatted string
     {
       surfaceUpdate: {
         surfaceId: 'main',
@@ -103,10 +103,40 @@ export function getSpendingSummaryMessages(): A2UIMessage[] {
           {
             id: 'total-card',
             component: {
-              Card: {
-                title: { literalString: 'Total Spending' },
-                excerpt: { literalString: `$${TOTAL_SPENDING.toFixed(2)}` },
-                subtitle: { literalString: 'Last 30 days • 46 transactions' },
+              Stack: {
+                direction: 'column',
+                gap: 'sm',
+              },
+            },
+            children: ['total-label', 'total-amount', 'total-period'],
+          },
+          {
+            id: 'total-label',
+            component: {
+              Text: {
+                text: { literalString: 'Total spending' },
+                variant: 'caption',
+              },
+            },
+          },
+          {
+            id: 'total-amount',
+            component: {
+              MoneyDisplay: {
+                amount: -TOTAL_SPENDING,
+                currency: 'USD',
+                variant: 'negative',
+                size: 'xlarge',
+                weight: 'bold',
+              },
+            },
+          },
+          {
+            id: 'total-period',
+            component: {
+              Text: {
+                text: { literalString: 'Last 30 days • 46 transactions' },
+                variant: 'body',
               },
             },
           },
@@ -133,7 +163,7 @@ export function getSpendingSummaryMessages(): A2UIMessage[] {
             id: 'category-header',
             component: {
               Text: {
-                text: { literalString: 'By Category' },
+                text: { literalString: 'By category' },
                 variant: 'h2',
               },
             },
@@ -142,24 +172,72 @@ export function getSpendingSummaryMessages(): A2UIMessage[] {
       },
     },
 
-    // Category cards
+    // Category breakdown cards - use MoneyDisplay and Progress
     {
       surfaceUpdate: {
         surfaceId: 'main',
-        components: SPENDING_DATA.map((cat, index) => ({
-          id: `category-${index}`,
-          component: {
-            Card: {
-              title: { literalString: cat.category },
-              excerpt: { literalString: `$${cat.amount.toFixed(2)} • ${cat.percentage}%` },
-              subtitle: {
-                literalString: `${cat.transactions} transactions • ${
-                  cat.trend === 'up' ? '↑' : cat.trend === 'down' ? '↓' : '→'
-                } ${cat.trend === 'up' ? 'Higher' : cat.trend === 'down' ? 'Lower' : 'Same'} than last month`,
+        components: SPENDING_DATA.flatMap((cat, index) => [
+          {
+            id: `category-${index}`,
+            component: {
+              Stack: {
+                direction: 'column',
+                gap: 'sm',
+              },
+            },
+            children: [
+              `cat-${index}-header`,
+              `cat-${index}-amount`,
+              `cat-${index}-progress`,
+              `cat-${index}-details`,
+            ],
+          },
+          {
+            id: `cat-${index}-header`,
+            component: {
+              Text: {
+                text: { literalString: cat.category },
+                variant: 'h3',
               },
             },
           },
-        })),
+          {
+            id: `cat-${index}-amount`,
+            component: {
+              MoneyDisplay: {
+                amount: -cat.amount,
+                currency: 'USD',
+                variant: 'negative',
+                size: 'medium',
+                weight: 'bold',
+              },
+            },
+          },
+          {
+            id: `cat-${index}-progress`,
+            component: {
+              Progress: {
+                value: cat.percentage,
+                variant: 'linear',
+                size: 'medium',
+                label: { literalString: `${cat.percentage}% of total spending` },
+              },
+            },
+          },
+          {
+            id: `cat-${index}-details`,
+            component: {
+              Text: {
+                text: {
+                  literalString: `${cat.transactions} transactions • ${
+                    cat.trend === 'up' ? '↑ Higher' : cat.trend === 'down' ? '↓ Lower' : '→ Same'
+                  } than last month`,
+                },
+                variant: 'caption',
+              },
+            },
+          },
+        ]),
       },
     },
 

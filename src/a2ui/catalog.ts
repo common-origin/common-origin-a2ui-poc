@@ -31,6 +31,18 @@ import {
   Checkbox,
   Sheet,
   ProgressBar,
+  // Banking Components - Phase 1 (Critical)
+  MoneyDisplay,
+  TransactionListItem,
+  AccountCard,
+  DateGroup,
+  EmptyState,
+  // Banking Components - Phase 2 (High Priority)
+  SearchField,
+  CategoryBadge,
+  StatusBadge,
+  TabBar,
+  ActionSheet,
 } from '@common-origin/design-system';
 import { renderSkeleton } from './skeleton';
 import type {
@@ -223,7 +235,7 @@ export function renderNode(
         excerpt: excerptText,
         subtitle: subtitleText,
         labels,
-        picture: '', // Required by CardLarge
+        picture: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23e9ecef" width="100" height="100"/%3E%3C/svg%3E', // Placeholder SVG
       }
     );
   }
@@ -438,6 +450,345 @@ export function renderNode(
     });
   }
 
+  // Banking Components - Phase 1 (Critical)
+  
+  if ('MoneyDisplay' in component) {
+    const { 
+      amount, 
+      currency = 'USD', 
+      variant = 'default', 
+      showSign = false, 
+      size = 'medium', 
+      weight = 'regular', 
+      locale = 'en-US',
+      align = 'left'
+    } = component.MoneyDisplay;
+    
+    const amountValue = typeof amount === 'number' ? amount : parseFloat(resolveDataBinding(amount, surface.dataModel));
+    
+    return React.createElement(MoneyDisplay, {
+      key: node.id,
+      amount: amountValue,
+      currency,
+      variant,
+      showSign,
+      size,
+      weight,
+      locale,
+      align,
+    });
+  }
+
+  if ('TransactionListItem' in component) {
+    const { 
+      merchant, 
+      amount, 
+      date, 
+      status, 
+      category, 
+      merchantLogo, 
+      description, 
+      hasReceipt, 
+      hasNote, 
+      currency = 'USD', 
+      onClick 
+    } = component.TransactionListItem;
+    
+    const merchantText = resolveDataBinding(merchant, surface.dataModel);
+    const amountValue = typeof amount === 'number' ? amount : parseFloat(resolveDataBinding(amount, surface.dataModel));
+    const dateValue = resolveDataBinding(date, surface.dataModel);
+    const descriptionText = description ? resolveDataBinding(description, surface.dataModel) : undefined;
+    
+    return React.createElement(TransactionListItem, {
+      key: node.id,
+      merchant: merchantText,
+      amount: amountValue,
+      date: dateValue,
+      status,
+      category,
+      merchantLogo,
+      description: descriptionText,
+      hasReceipt,
+      hasNote,
+      currency,
+      onClick: onClick ? () => onAction?.(onClick) : undefined,
+    });
+  }
+
+  if ('AccountCard' in component) {
+    const { 
+      accountType, 
+      accountName, 
+      balance, 
+      accountNumber, 
+      trend, 
+      trendValue, 
+      action, 
+      secondaryAction, 
+      currency = 'USD', 
+      onClick 
+    } = component.AccountCard;
+    
+    const accountNameText = resolveDataBinding(accountName, surface.dataModel);
+    const balanceValue = typeof balance === 'number' ? balance : parseFloat(resolveDataBinding(balance, surface.dataModel));
+    const trendValueText = trendValue ? resolveDataBinding(trendValue, surface.dataModel) : undefined;
+    
+    return React.createElement(AccountCard, {
+      key: node.id,
+      accountType,
+      accountName: accountNameText,
+      balance: balanceValue,
+      accountNumber,
+      trend,
+      trendValue: trendValueText,
+      action: action ? {
+        label: action.label,
+        onClick: () => onAction?.(action.onClick),
+        icon: action.icon as any,
+        variant: action.variant,
+      } : undefined,
+      secondaryAction: secondaryAction ? {
+        label: secondaryAction.label,
+        onClick: () => onAction?.(secondaryAction.onClick),
+        icon: secondaryAction.icon as any,
+        variant: secondaryAction.variant,
+      } : undefined,
+      currency,
+      onClick: onClick ? () => onAction?.(onClick) : undefined,
+    });
+  }
+
+  if ('DateGroup' in component) {
+    const { 
+      date, 
+      format = 'medium', 
+      showTotal = false, 
+      totalAmount, 
+      showCount = false, 
+      count, 
+      sticky = false, 
+      currency = 'USD' 
+    } = component.DateGroup;
+    
+    const dateValue = resolveDataBinding(date, surface.dataModel);
+    const totalAmountValue = totalAmount !== undefined 
+      ? (typeof totalAmount === 'number' ? totalAmount : parseFloat(resolveDataBinding(totalAmount, surface.dataModel)))
+      : undefined;
+    const countValue = count !== undefined 
+      ? (typeof count === 'number' ? count : parseInt(resolveDataBinding(count, surface.dataModel)))
+      : undefined;
+    
+    return React.createElement(
+      DateGroup,
+      {
+        key: node.id,
+        date: dateValue,
+        format: format as any,
+        showTotal,
+        totalAmount: totalAmountValue,
+        showCount,
+        count: countValue,
+        sticky,
+        currency,
+        children: childElements,
+      }
+    );
+  }
+
+  if ('EmptyState' in component) {
+    const { 
+      illustration, 
+      title, 
+      description, 
+      action, 
+      secondaryAction, 
+      variant = 'default', 
+      size = 'medium' 
+    } = component.EmptyState;
+    
+    const titleText = resolveDataBinding(title, surface.dataModel);
+    const descriptionText = resolveDataBinding(description, surface.dataModel);
+    
+    return React.createElement(EmptyState, {
+      key: node.id,
+      illustration,
+      title: titleText,
+      description: descriptionText,
+      action: action ? {
+        label: action.label,
+        onClick: () => onAction?.(action.onClick),
+        variant: action.variant,
+        icon: action.icon as any,
+      } : undefined,
+      secondaryAction: secondaryAction ? {
+        label: secondaryAction.label,
+        onClick: () => onAction?.(secondaryAction.onClick),
+        variant: secondaryAction.variant,
+        icon: secondaryAction.icon as any,
+      } : undefined,
+      variant,
+      size,
+    });
+  }
+
+  // Banking Components - Phase 2 (High Priority)
+  
+  if ('SearchField' in component) {
+    const { 
+      value, 
+      onChange, 
+      suggestions, 
+      showRecentSearches, 
+      recentSearches, 
+      onSuggestionSelect, 
+      onClearRecentSearches, 
+      debounceMs = 300, 
+      placeholder = 'Search...', 
+      disabled = false, 
+      loading = false 
+    } = component.SearchField;
+    
+    const valueText = resolveDataBinding(value, surface.dataModel);
+    
+    return React.createElement(SearchField, {
+      key: node.id,
+      value: valueText,
+      onChange: (newValue: string) => {
+        const action = {
+          ...onChange,
+          value: newValue,
+          updateDataModel: onChange.dataPath ? { [onChange.dataPath]: newValue } : undefined,
+        };
+        onAction?.(action);
+      },
+      suggestions,
+      showRecentSearches,
+      recentSearches,
+      onSuggestionSelect: onSuggestionSelect ? (suggestion: any) => {
+        const action = {
+          ...onSuggestionSelect,
+          value: typeof suggestion === 'string' ? suggestion : suggestion.id,
+        };
+        onAction?.(action);
+      } : undefined,
+      onClearRecentSearches: onClearRecentSearches ? () => onAction?.(onClearRecentSearches) : undefined,
+      debounceMs,
+      placeholder,
+      disabled,
+      loading,
+    });
+  }
+
+  if ('CategoryBadge' in component) {
+    const { 
+      content, 
+      color = 'blue', 
+      variant = 'filled', 
+      size = 'medium', 
+      icon, 
+      onClick, 
+      disabled = false 
+    } = component.CategoryBadge;
+    
+    const contentText = resolveDataBinding(content, surface.dataModel);
+    
+    return React.createElement(
+      CategoryBadge,
+      {
+        key: node.id,
+        color,
+        variant,
+        size,
+        icon: icon as any,
+        onClick: onClick ? () => onAction?.(onClick) : undefined,
+        disabled,
+        children: contentText,
+      }
+    );
+  }
+
+  if ('StatusBadge' in component) {
+    const { 
+      status, 
+      label, 
+      size = 'medium', 
+      showIcon = true, 
+      liveRegion = true 
+    } = component.StatusBadge;
+    
+    const labelText = label ? resolveDataBinding(label, surface.dataModel) : undefined;
+    
+    return React.createElement(StatusBadge, {
+      key: node.id,
+      status,
+      label: labelText,
+      size,
+      showIcon,
+      liveRegion,
+    });
+  }
+
+  if ('TabBar' in component) {
+    const { 
+      tabs, 
+      activeTab, 
+      onTabChange, 
+      variant = 'default' 
+    } = component.TabBar;
+    
+    const activeTabValue = typeof activeTab === 'string' ? activeTab : resolveDataBinding(activeTab, surface.dataModel);
+    
+    return React.createElement(TabBar, {
+      key: node.id,
+      tabs,
+      activeTab: activeTabValue,
+      onTabChange: (tabId: string) => {
+        const action = {
+          ...onTabChange,
+          value: tabId,
+          updateDataModel: onTabChange.dataPath ? { [onTabChange.dataPath]: tabId } : undefined,
+        };
+        onAction?.(action);
+      },
+      variant,
+    });
+  }
+
+  if ('ActionSheet' in component) {
+    const { 
+      isOpen, 
+      onClose, 
+      title, 
+      description, 
+      actions, 
+      closeOnOverlayClick = true, 
+      closeOnEscape = true, 
+      showCloseButton = true 
+    } = component.ActionSheet;
+    
+    const titleText = title ? resolveDataBinding(title, surface.dataModel) : undefined;
+    const descriptionText = description ? resolveDataBinding(description, surface.dataModel) : undefined;
+    
+    return React.createElement(ActionSheet, {
+      key: node.id,
+      isOpen,
+      onClose: () => onAction?.(onClose),
+      title: titleText,
+      description: descriptionText,
+      actions: actions.map(action => ({
+        id: action.id,
+        label: action.label,
+        icon: action.icon as any,
+        destructive: action.destructive,
+        disabled: action.disabled,
+        onSelect: () => onAction?.(action.onSelect),
+      })),
+      closeOnOverlayClick,
+      closeOnEscape,
+      showCloseButton,
+    });
+  }
+
   return null;
 }
 
@@ -464,6 +815,18 @@ export function isValidComponent(component: CatalogComponent): boolean {
     'Checkbox',
     'Modal',
     'Progress',
+    // Banking Components - Phase 1 (Critical)
+    'MoneyDisplay',
+    'TransactionListItem',
+    'AccountCard',
+    'DateGroup',
+    'EmptyState',
+    // Banking Components - Phase 2 (High Priority)
+    'SearchField',
+    'CategoryBadge',
+    'StatusBadge',
+    'TabBar',
+    'ActionSheet',
   ];
   
   return validTypes.some((type) => type in component);
@@ -475,7 +838,7 @@ export function isValidComponent(component: CatalogComponent): boolean {
 export function getCatalogMetadata() {
   return {
     catalogId: CATALOG_ID,
-    version: '2.0',
+    version: '2.3',
     components: [
       { name: 'Text', description: 'Render text with typography variants' },
       { name: 'Button', description: 'Interactive button with variants' },
@@ -495,6 +858,18 @@ export function getCatalogMetadata() {
       { name: 'Checkbox', description: 'Toggle checkbox for boolean inputs' },
       { name: 'Modal', description: 'Modal dialog for confirmations' },
       { name: 'Progress', description: 'Progress indicator with percentage' },
+      // Banking Components - Phase 1 (Critical)
+      { name: 'MoneyDisplay', description: 'Display formatted monetary amounts with currency, color variants (positive/negative), and localization' },
+      { name: 'TransactionListItem', description: 'Rich transaction display with merchant info, amount, date, status badge, category, and optional receipt/note indicators' },
+      { name: 'AccountCard', description: 'Account summary card showing account type, name, balance, trend indicator, and action buttons' },
+      { name: 'DateGroup', description: 'Date-grouped list container with formatted date header, optional total amount and item count' },
+      { name: 'EmptyState', description: 'Engaging empty state with illustration, title, description, and call-to-action buttons' },
+      // Banking Components - Phase 2 (High Priority)
+      { name: 'SearchField', description: 'Advanced search input with autocomplete suggestions, recent searches, and debouncing' },
+      { name: 'CategoryBadge', description: 'Category indicator badge with 8 color options, icons, and multiple visual variants' },
+      { name: 'StatusBadge', description: 'Transaction status badge with 6 status types (pending, completed, failed, etc.) and semantic colors' },
+      { name: 'TabBar', description: 'Accessible tab navigation with 3 visual variants (default, pills, underline) and badge counts' },
+      { name: 'ActionSheet', description: 'Mobile-optimized bottom sheet modal for displaying action menus with icons and destructive actions' },
     ],
   };
 }

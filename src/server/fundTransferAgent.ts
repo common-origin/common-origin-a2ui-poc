@@ -62,7 +62,7 @@ export function getFundTransferMessages(): A2UIMessage[] {
             id: 'title',
             component: {
               Text: {
-                text: { literalString: 'Transfer Money' },
+                text: { literalString: 'Transfer money' },
                 variant: 'h1',
               },
             },
@@ -271,7 +271,7 @@ export function getFundTransferMessages(): A2UIMessage[] {
               Alert: {
                 content: { literalString: 'Transfers between your accounts are processed immediately and are free of charge. Instant transfers may incur a small fee.' },
                 variant: 'info',
-                title: { literalString: 'Transfer Information' },
+                title: { literalString: 'Transfer information' },
               },
             },
           },

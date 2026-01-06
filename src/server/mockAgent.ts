@@ -78,7 +78,7 @@ function generateInitialUIMessages(): A2UIMessage[] {
             id: 'header',
             component: {
               Text: {
-                text: { literalString: 'Transaction Finder' },
+                text: { literalString: 'Transaction finder' },
                 variant: 'h1',
               },
             },
@@ -111,10 +111,13 @@ function generateSearchSectionMessages(): A2UIMessage[] {
           {
             id: 'search-field',
             component: {
-              TextField: {
-                label: { literalString: 'Search transactions' },
-                type: 'search',
-                helperText: { literalString: 'Search by merchant, category, or amount' },
+              SearchField: {
+                value: { path: '/query' },
+                placeholder: 'Search by merchant, category, or amount',
+                onChange: {
+                  eventType: 'change',
+                  dataPath: 'query',
+                },
               },
             },
           },
@@ -208,24 +211,25 @@ function generateFilterSectionMessages(): A2UIMessage[] {
  * Generate results section with transactions
  */
 function generateResultsSectionMessages(): A2UIMessage[] {
-  const listItemComponents = MOCK_TRANSACTIONS.map((tx, index) => ({
+  // Map category strings to valid category types
+  const categoryMap: Record<string, 'shopping' | 'dining' | 'transport' | 'entertainment' | 'bills' | 'other'> = {
+    'Groceries': 'shopping',
+    'Transportation': 'transport',
+    'Entertainment': 'entertainment',
+    'Food & Drink': 'dining',
+    'Shopping': 'shopping',
+  };
+
+  const transactionComponents = MOCK_TRANSACTIONS.map((tx, index) => ({
     id: `tx-item-${index}`,
     component: {
-      ListItem: {
-        primary: { literalString: tx.merchant },
-        secondary: { literalString: `${tx.date} • ${tx.category}` },
-        badge: `tx-badge-${index}`,
-      },
-    },
-  }));
-
-  const badgeComponents = MOCK_TRANSACTIONS.map((tx, index) => ({
-    id: `tx-badge-${index}`,
-    component: {
-      Chip: {
-        content: { literalString: `$${Math.abs(tx.amount).toFixed(2)}` },
-        variant: 'emphasis' as const,
-        size: 'small' as const,
+      TransactionListItem: {
+        merchant: { literalString: tx.merchant },
+        amount: tx.amount,
+        date: { literalString: tx.date },
+        status: 'completed' as const,
+        category: categoryMap[tx.category] || 'other',
+        currency: 'USD',
       },
     },
   }));
@@ -243,7 +247,7 @@ function generateResultsSectionMessages(): A2UIMessage[] {
                 gap: 'md',
               },
             },
-            children: ['results-header', 'results-list'],
+            children: ['results-header', 'date-group-today', 'date-group-yesterday'],
           },
           {
             id: 'results-header',
@@ -254,18 +258,35 @@ function generateResultsSectionMessages(): A2UIMessage[] {
               },
             },
           },
+          // Today's transactions
           {
-            id: 'results-list',
+            id: 'date-group-today',
             component: {
-              List: {
-                dividers: true,
-                spacing: 'comfortable',
+              DateGroup: {
+                date: { literalString: 'Today' },
+                format: 'relative',
+                showCount: true,
+                count: 2,
+                currency: 'USD',
               },
             },
-            children: listItemComponents.map((item) => item.id),
+            children: ['tx-item-0', 'tx-item-1'],
           },
-          ...listItemComponents,
-          ...badgeComponents,
+          // Yesterday's transactions
+          {
+            id: 'date-group-yesterday',
+            component: {
+              DateGroup: {
+                date: { literalString: 'Yesterday' },
+                format: 'relative',
+                showCount: true,
+                count: 3,
+                currency: 'USD',
+              },
+            },
+            children: ['tx-item-2', 'tx-item-3', 'tx-item-4'],
+          },
+          ...transactionComponents,
         ],
       },
     },
@@ -289,15 +310,17 @@ function generateEmptyStateMessages(): A2UIMessage[] {
                 gap: 'md',
               },
             },
-            children: ['empty-alert'],
+            children: ['empty-state'],
           },
           {
-            id: 'empty-alert',
+            id: 'empty-state',
             component: {
-              Alert: {
+              EmptyState: {
+                illustration: 'search',
                 title: { literalString: 'No transactions found' },
-                content: { literalString: 'Try adjusting your search terms or filters' },
-                variant: 'info',
+                description: { literalString: 'Try adjusting your search terms or filters to find what you\'re looking for.' },
+                variant: 'default',
+                size: 'medium',
               },
             },
           },

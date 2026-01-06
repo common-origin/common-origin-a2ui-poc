@@ -9,12 +9,10 @@
  * - All components come from trusted catalog
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { A2UISurface, useA2UISurface } from '@/src/components/A2UISurface';
 import { A2UIErrorBoundary } from '@/src/components/A2UIErrorBoundary';
-import { streamTransactionFinderUI } from '@/src/server/mockAgent';
-import { streamSpendingSummaryUI } from '@/src/server/spendingSummaryAgent';
-import { streamFundTransferUI } from '@/src/server/fundTransferAgent';
+import { callAgent, getAgentMode, isRealAgentAvailable } from '@/src/lib/agentClient';
 import { analyzeQuery, getUnknownQueryResponse } from '@/src/server/queryRouter';
 import styled from 'styled-components';
 import {
@@ -92,7 +90,15 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
   const [query, setQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [agentMode, setAgentMode] = useState<'mock' | 'real'>(getAgentMode());
+  const [realAgentAvailable, setRealAgentAvailable] = useState(false);
   const { sendMessage } = useA2UISurface('main');
+
+  // Check if real agent is available on mount
+  useEffect(() => {
+    isRealAgentAvailable().then(setRealAgentAvailable);
+  }, []);
 
   const handleSubmit = async (userQuery?: string) => {
     const queryToProcess = userQuery || query;
@@ -100,6 +106,7 @@ export default function Home() {
 
     setIsGenerating(true);
     setHasGenerated(false);
+    setError(null);
     setQuery('');
 
     // Reset surface first
@@ -109,55 +116,72 @@ export default function Home() {
       },
     });
 
-    // Analyze query and route to appropriate scenario
+    // Analyze query and get scenario hint
     const analysis = analyzeQuery(queryToProcess);
     console.log('[Query Router] Analysis:', analysis);
 
+    // Map scenario to agent hint
+    let scenarioHint: string | undefined;
+    if (analysis.scenario === 'transaction-search') {
+      scenarioHint = 'transaction-finder';
+    } else if (analysis.scenario === 'spending-summary') {
+      scenarioHint = 'spending-summary';
+    } else if (analysis.scenario === 'fund-transfer') {
+      scenarioHint = 'fund-transfer';
+    }
+
     try {
-      if (analysis.scenario === 'transaction-search') {
-        const showEmpty = queryToProcess.toLowerCase().includes('empty');
-        await streamTransactionFinderUI(
-          (message) => sendMessage(message),
-          showEmpty
-        );
-      } else if (analysis.scenario === 'spending-summary') {
-        await streamSpendingSummaryUI(
-          (message) => sendMessage(message)
-        );
-      } else if (analysis.scenario === 'fund-transfer') {
-        await streamFundTransferUI(
-          (message) => sendMessage(message)
-        );
-      } else {
-        // Unknown query - show help message
-        const helpText = getUnknownQueryResponse();
-        sendMessage({
-          surfaceUpdate: {
-            surfaceId: 'main',
-            components: [
-              {
-                id: 'help-alert',
-                component: {
-                  Alert: {
-                    content: { literalString: helpText },
-                    variant: 'info',
-                    title: { literalString: 'How can I help?' },
-                  },
-                },
-              },
-            ],
+      // Call unified agent interface
+      await callAgent(
+        queryToProcess,
+        (message) => {
+          console.log('[Demo] Received message from agent:', Object.keys(message)[0]);
+          console.log('[Demo] Full message:', message);
+          sendMessage(message);
+        },
+        scenarioHint,
+        {
+          forceMode: agentMode,
+          onError: (err) => {
+            console.error('[Demo] Agent error:', err);
+            setError(err.message);
           },
-        });
-        sendMessage({
-          beginRendering: {
-            surfaceId: 'main',
-            root: 'help-alert',
-            catalogId: 'common-origin.design-system:v2.0',
-          },
-        });
-      }
+          retryOnError: true, // Fallback to mock if real agent fails
+        }
+      );
     } catch (error) {
       console.error('[Demo] Error generating UI:', error);
+      setError(error instanceof Error ? error.message : 'Failed to generate UI');
+      
+      // Show error message in UI
+      sendMessage({
+        surfaceUpdate: {
+          surfaceId: 'main',
+          components: [
+            {
+              id: 'error-alert',
+              component: {
+                Alert: {
+                  content: { 
+                    literalString: error instanceof Error 
+                      ? error.message 
+                      : 'Failed to generate UI. Please try again.' 
+                  },
+                  variant: 'error',
+                  title: { literalString: 'Error' },
+                },
+              },
+            },
+          ],
+        },
+      });
+      sendMessage({
+        beginRendering: {
+          surfaceId: 'main',
+          root: 'error-alert',
+          catalogId: 'common-origin.design-system:v2.3',
+        },
+      });
     }
 
     setIsGenerating(false);
@@ -192,6 +216,33 @@ export default function Home() {
           </div>
         </header>
 
+        {/* Agent Mode Toggle */}
+        {realAgentAvailable && (
+          <Box style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center', gap: '1rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: 500 }}>
+              Agent Mode:
+            </span>
+            <Stack direction="row" gap="xs">
+              <Chip
+                onClick={() => setAgentMode('mock')}
+                variant={agentMode === 'mock' ? 'emphasis' : 'subtle'}
+                aria-label="Use mock agent"
+                aria-pressed={agentMode === 'mock'}
+              >
+                Mock
+              </Chip>
+              <Chip
+                onClick={() => setAgentMode('real')}
+                variant={agentMode === 'real' ? 'emphasis' : 'subtle'}
+                aria-label="Use real Gemini agent"
+                aria-pressed={agentMode === 'real'}
+              >
+                Real (Gemini)
+              </Chip>
+            </Stack>
+          </Box>
+        )}
+
         {/* Security Info Banner */}
         <Box style={{ marginBottom: '2rem' }}>
           <Alert variant="info" title="Security Model">
@@ -201,6 +252,19 @@ export default function Home() {
             and ensures consistent design.
           </Alert>
         </Box>
+
+        {/* Error Display */}
+        {error && !isGenerating && (
+          <Box style={{ marginBottom: '1rem' }}>
+            <Alert variant="error" title="Agent Error">
+              {error}
+              {' '}
+              {agentMode === 'real' && (
+                <span>The mock agent was used as fallback.</span>
+              )}
+            </Alert>
+          </Box>
+        )}
 
         {/* Example Query Chips */}
         <div style={{ marginBottom: '1rem' }}>

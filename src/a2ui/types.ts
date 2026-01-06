@@ -73,7 +73,19 @@ export type CatalogComponent =
   | { NumberField: NumberFieldComponent }
   | { Checkbox: CheckboxComponent }
   | { Modal: ModalComponent }
-  | { Progress: ProgressComponent };
+  | { Progress: ProgressComponent }
+  // Banking Components - Phase 1 (Critical)
+  | { MoneyDisplay: MoneyDisplayComponent }
+  | { TransactionListItem: TransactionListItemComponent }
+  | { AccountCard: AccountCardComponent }
+  | { DateGroup: DateGroupComponent }
+  | { EmptyState: EmptyStateComponent }
+  // Banking Components - Phase 2 (High Priority)
+  | { SearchField: SearchFieldComponent }
+  | { CategoryBadge: CategoryBadgeComponent }
+  | { StatusBadge: StatusBadgeComponent }
+  | { TabBar: TabBarComponent }
+  | { ActionSheet: ActionSheetComponent };
 
 export interface TextComponent {
   text: DataBinding | { literalString: string };
@@ -203,6 +215,160 @@ export interface ProgressComponent {
   variant?: 'linear' | 'circular';
   size?: 'small' | 'medium' | 'large';
   label?: DataBinding | { literalString: string };
+}
+
+/**
+ * Banking Component Interfaces - Phase 1 (Critical)
+ */
+
+export interface MoneyDisplayComponent {
+  amount: number | DataBinding;
+  currency?: string;
+  variant?: 'default' | 'positive' | 'negative' | 'neutral';
+  showSign?: boolean;
+  size?: 'small' | 'medium' | 'large' | 'xlarge';
+  weight?: 'regular' | 'medium' | 'bold';
+  locale?: string;
+  align?: 'left' | 'center' | 'right';
+}
+
+export interface TransactionListItemComponent {
+  merchant: DataBinding | { literalString: string };
+  amount: number | DataBinding;
+  date: DataBinding | { literalString: string };
+  status?: 'completed' | 'pending' | 'failed';
+  category?: 'shopping' | 'dining' | 'transport' | 'entertainment' | 'bills' | 'other';
+  merchantLogo?: string;
+  description?: DataBinding | { literalString: string };
+  hasReceipt?: boolean;
+  hasNote?: boolean;
+  currency?: string;
+  onClick?: ActionBinding;
+}
+
+export interface AccountCardComponent {
+  accountType: 'checking' | 'savings' | 'credit' | 'investment' | 'loan';
+  accountName: DataBinding | { literalString: string };
+  balance: number | DataBinding;
+  accountNumber?: string;
+  trend?: 'up' | 'down' | 'neutral';
+  trendValue?: DataBinding | { literalString: string };
+  action?: {
+    label: string;
+    onClick: ActionBinding;
+    icon?: string;
+    variant?: 'primary' | 'secondary' | 'naked';
+  };
+  secondaryAction?: {
+    label: string;
+    onClick: ActionBinding;
+    icon?: string;
+    variant?: 'primary' | 'secondary' | 'naked';
+  };
+  currency?: string;
+  onClick?: ActionBinding;
+}
+
+export interface DateGroupComponent {
+  date: DataBinding | { literalString: string };
+  format?: 'full' | 'long' | 'medium' | 'short' | 'relative';
+  showTotal?: boolean;
+  totalAmount?: number | DataBinding;
+  showCount?: boolean;
+  count?: number | DataBinding;
+  sticky?: boolean;
+  currency?: string;
+}
+
+export interface EmptyStateComponent {
+  illustration?: 'search' | 'transactions' | 'notifications' | 'empty' | 'error';
+  title: DataBinding | { literalString: string };
+  description: DataBinding | { literalString: string };
+  action?: {
+    label: string;
+    onClick: ActionBinding;
+    variant?: 'primary' | 'secondary';
+    icon?: string;
+  };
+  secondaryAction?: {
+    label: string;
+    onClick: ActionBinding;
+    variant?: 'primary' | 'secondary';
+    icon?: string;
+  };
+  variant?: 'default' | 'error' | 'success';
+  size?: 'small' | 'medium' | 'large';
+}
+
+/**
+ * Banking Component Interfaces - Phase 2 (High Priority)
+ */
+
+export interface SearchFieldComponent {
+  value: DataBinding | { literalString: string };
+  onChange: ActionBinding;
+  suggestions?: Array<{
+    id: string;
+    label: string;
+    description?: string;
+    category?: string;
+  }>;
+  showRecentSearches?: boolean;
+  recentSearches?: string[];
+  onSuggestionSelect?: ActionBinding;
+  onClearRecentSearches?: ActionBinding;
+  debounceMs?: number;
+  placeholder?: string;
+  disabled?: boolean;
+  loading?: boolean;
+}
+
+export interface CategoryBadgeComponent {
+  content: DataBinding | { literalString: string };
+  color?: 'blue' | 'purple' | 'pink' | 'yellow' | 'green' | 'red' | 'orange' | 'gray';
+  variant?: 'filled' | 'outlined' | 'minimal';
+  size?: 'small' | 'medium';
+  icon?: string;
+  onClick?: ActionBinding;
+  disabled?: boolean;
+}
+
+export interface StatusBadgeComponent {
+  status: 'pending' | 'completed' | 'failed' | 'cancelled' | 'processing' | 'scheduled';
+  label?: DataBinding | { literalString: string };
+  size?: 'small' | 'medium';
+  showIcon?: boolean;
+  liveRegion?: boolean;
+}
+
+export interface TabBarComponent {
+  tabs: Array<{
+    id: string;
+    label: string;
+    badge?: number;
+    disabled?: boolean;
+  }>;
+  activeTab: string | DataBinding;
+  onTabChange: ActionBinding;
+  variant?: 'default' | 'pills' | 'underline';
+}
+
+export interface ActionSheetComponent {
+  isOpen: boolean;
+  onClose: ActionBinding;
+  title?: DataBinding | { literalString: string };
+  description?: DataBinding | { literalString: string };
+  actions: Array<{
+    id: string;
+    label: string;
+    icon?: string;
+    destructive?: boolean;
+    disabled?: boolean;
+    onSelect: ActionBinding;
+  }>;
+  closeOnOverlayClick?: boolean;
+  closeOnEscape?: boolean;
+  showCloseButton?: boolean;
 }
 
 export interface DataBinding {
