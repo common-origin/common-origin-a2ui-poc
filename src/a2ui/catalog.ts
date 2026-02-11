@@ -47,789 +47,664 @@ import {
 import { renderSkeleton } from './skeleton';
 import type {
   ComponentNode,
-  CatalogComponent,
+  StringOrPath,
+  NumberOrPath,
   DataBinding,
   SurfaceState,
 } from './types';
 
-/**
- * Catalog ID for this implementation
- */
-export const CATALOG_ID = 'common-origin.design-system:v2.0';
+// Re-export CATALOG_ID from constants for backward compatibility
+export { CATALOG_ID } from './constants';
+import { CATALOG_ID } from './constants';
+
+// ── Security: URL Sanitization ────────────────────────────────────────────
+const SAFE_URL_PREFIXES = ['http://', 'https://', 'data:image/'];
 
 /**
- * Resolve a data binding to an actual value from the data model
+ * Sanitize a URL value from agent data.
+ * Prevents javascript: URIs, data: URIs (except images), and other injection vectors.
+ * Returns empty string for unsafe URLs.
  */
-function resolveDataBinding(
-  binding: DataBinding | { literalString: string },
-  dataModel: Map<string, any>
-): string {
-  if ('literalString' in binding) {
-    return binding.literalString;
+export function sanitizeUrl(url: unknown): string {
+  if (typeof url !== 'string') return '';
+  const trimmed = url.trim().toLowerCase();
+  if (SAFE_URL_PREFIXES.some(prefix => trimmed.startsWith(prefix))) {
+    return url; // Return original (not lowered) if safe
   }
-  
-  if ('path' in binding) {
-    const path = binding.path.split('/').filter(Boolean);
-    let value: any = Object.fromEntries(dataModel);
-    
+  // Allow relative paths (no protocol)
+  if (!trimmed.includes(':')) return url;
+  // Block everything else (javascript:, data:text/html, etc.)
+  return '';
+}
+
+
+/**
+ * Resolve a v0.9 stringOrPath binding to an actual value.
+ *
+ * v0.9 format:
+ *   - Plain string: "Hello" → used as-is
+ *   - Path object:  { path: "/key" } → resolved from data model
+ *   - Legacy literalString: { literalString: "Hello" } → still accepted for compat
+ */
+function resolveBinding(
+  binding: StringOrPath | NumberOrPath | undefined,
+  dataModel: Map<string, unknown>
+): string {
+  if (binding === undefined || binding === null) return '';
+
+  // Plain string (v0.9 primary format)
+  if (typeof binding === 'string') return binding;
+
+  // Plain number
+  if (typeof binding === 'number') return String(binding);
+
+  // Path reference
+  if (typeof binding === 'object' && 'path' in binding) {
+    const path = (binding as DataBinding).path.split('/').filter(Boolean);
+    let value: unknown = Object.fromEntries(dataModel);
     for (const segment of path) {
-      value = value?.[segment];
+      value = (value as Record<string, unknown>)?.[segment];
     }
-    
     return value?.toString() || '';
   }
-  
+
+  // Legacy { literalString } compat
+  if (typeof binding === 'object' && 'literalString' in binding) {
+    return (binding as { literalString: string }).literalString;
+  }
+
   return '';
+}
+
+/** Resolve a numeric binding. */
+function resolveNumber(
+  binding: NumberOrPath | undefined,
+  dataModel: Map<string, unknown>
+): number {
+  if (binding === undefined || binding === null) return 0;
+  if (typeof binding === 'number') return binding;
+  return parseFloat(resolveBinding(binding, dataModel)) || 0;
 }
 
 /**
  * Render a catalog component node to a React element
- * 
+ *
+ * v0.9 format: node.component is a string type name, props sit on the node itself.
  * This is the core security boundary: only components defined here can be rendered.
- * Agent messages can only reference these components with their defined props.
  */
+const MAX_TREE_DEPTH = 10;
+
 export function renderNode(
   node: ComponentNode,
   surface: SurfaceState,
-  onAction?: (action: any) => void
+  onAction?: (action: any) => void,
+  depth: number = 0
 ): React.ReactElement | null {
-  const { component, children = [] } = node;
-  
+  // DoS protection: cap tree depth
+  if (depth > MAX_TREE_DEPTH) {
+    return React.createElement('span', { key: node.id, style: { display: 'none' } }, `[max depth ${MAX_TREE_DEPTH}]`);
+  }
+
+  const { id, component: componentType, children: childIds = [] } = node;
+  const dm = surface.dataModel;
+
   // Resolve child components
-  const childElements = children
+  const childElements = (childIds as string[])
     .map((childId) => {
       const childNode = surface.components.get(childId);
-      return childNode ? renderNode(childNode, surface, onAction) : null;
+      return childNode ? renderNode(childNode, surface, onAction, depth + 1) : null;
     })
     .filter(Boolean);
 
-  // Map catalog component types to Common Origin components
-  if ('Text' in component) {
-    const { text, variant = 'body' } = component.Text;
-    const content = resolveDataBinding(text, surface.dataModel);
-    
-    return React.createElement(
-      Typography,
-      { key: node.id, variant, children: content }
-    );
-  }
-
-  if ('Button' in component) {
-    const { label, variant = 'primary', size = 'medium', action, disabled = false } = component.Button;
-    const content = resolveDataBinding(label, surface.dataModel);
-    
-    return React.createElement(
-      Button,
-      {
-        key: node.id,
-        variant,
-        size,
-        disabled,
-        onClick: action ? () => onAction?.(action) : undefined,
-        children: content,
-      }
-    );
-  }
-
-  if ('TextField' in component) {
-    const { label, value, helperText, error, type = 'text', required = false, disabled = false, onChange } = component.TextField;
-    const labelText = resolveDataBinding(label, surface.dataModel);
-    const helperTextValue = helperText ? resolveDataBinding(helperText, surface.dataModel) : undefined;
-    const errorText = error ? resolveDataBinding(error, surface.dataModel) : undefined;
-    const valueText = value ? resolveDataBinding(value, surface.dataModel) : undefined;
-    
-    // If no onChange is provided, use defaultValue (uncontrolled)
-    const fieldProps: any = {
-      key: node.id,
-      label: labelText,
-      type,
-      helperText: helperTextValue || '',
-      error: errorText || '',
-      required,
-      disabled,
-    };
-    
-    if (onChange) {
-      fieldProps.value = valueText || '';
-      fieldProps.onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        // Build action with updated value and data path for data model update
-        const action = {
-          ...onChange,
-          value: e.target.value,
-          updateDataModel: onChange.dataPath ? { [onChange.dataPath]: e.target.value } : undefined,
-        };
-        onAction?.(action);
-      };
-    } else if (valueText !== undefined) {
-      fieldProps.defaultValue = valueText;
+  switch (componentType) {
+    // ── Typography & Content ──────────────────────────────────────────
+    case 'Text': {
+      const content = resolveBinding(node.text as StringOrPath, dm);
+      return React.createElement(Typography, { key: id, variant: node.variant || 'body', children: content });
     }
-    
-    return React.createElement(TextField, fieldProps);
-  }
 
-  if ('Chip' in component) {
-    const { content, variant = 'default', size = 'medium', onClick } = component.Chip;
-    const text = resolveDataBinding(content, surface.dataModel);
-    
-    return React.createElement(
-      Chip,
-      {
-        key: node.id,
-        variant,
-        size,
-        onClick: onClick ? () => onAction?.(onClick) : undefined,
-      },
-      text
-    );
-  }
+    case 'Alert': {
+      const content = resolveBinding(node.content as StringOrPath, dm);
+      const title = node.title ? resolveBinding(node.title as StringOrPath, dm) : '';
+      return React.createElement(Alert, { key: id, variant: node.variant || 'info', title, children: content });
+    }
 
-  if ('FilterChip' in component) {
-    const { content, selected = false, onDismiss } = component.FilterChip;
-    const text = resolveDataBinding(content, surface.dataModel);
-    
-    return React.createElement(
-      FilterChip,
-      {
-        key: node.id,
-        selected,
-        onDismiss: onDismiss ? () => onAction?.(onDismiss) : () => {},
-      },
-      text
-    );
-  }
+    case 'EmptyState': {
+      const title = resolveBinding(node.title as StringOrPath, dm);
+      const description = resolveBinding(node.description as StringOrPath, dm);
+      return React.createElement(EmptyState, {
+        key: id,
+        illustration: node.illustration,
+        title,
+        description,
+        action: node.action ? {
+          label: (node.action as any).label,
+          onClick: () => onAction?.((node.action as any).onClick),
+          variant: (node.action as any).variant,
+          icon: (node.action as any).icon,
+        } : undefined,
+        secondaryAction: node.secondaryAction ? {
+          label: (node.secondaryAction as any).label,
+          onClick: () => onAction?.((node.secondaryAction as any).onClick),
+          variant: (node.secondaryAction as any).variant,
+          icon: (node.secondaryAction as any).icon,
+        } : undefined,
+        variant: node.variant || 'default',
+        size: node.size || 'medium',
+      });
+    }
 
-  if ('BooleanChip' in component) {
-    const { content, selected = false, onClick } = component.BooleanChip;
-    const text = resolveDataBinding(content, surface.dataModel);
-    
-    return React.createElement(
-      BooleanChip,
-      {
-        key: node.id,
-        selected,
-        onClick: onClick ? () => {
-          // Toggle the selected state in data model if dataPath is provided
-          const action = {
-            ...onClick,
-            value: !selected,
-            updateDataModel: onClick.dataPath ? { [onClick.dataPath]: !selected } : undefined,
-          };
-          onAction?.(action);
+    // ── Layout ────────────────────────────────────────────────────────
+    case 'Stack': {
+      return React.createElement(Stack, {
+        key: id,
+        direction: node.direction,
+        gap: node.gap || 'md',
+        children: childElements,
+      });
+    }
+
+    case 'Divider': {
+      return React.createElement(Divider, {
+        key: id,
+        orientation: node.orientation || 'horizontal',
+      });
+    }
+
+    // ── Form Controls ─────────────────────────────────────────────────
+    case 'TextField': {
+      const label = resolveBinding(node.label as StringOrPath, dm);
+      const helperText = node.helperText ? resolveBinding(node.helperText as StringOrPath, dm) : '';
+      const errorText = node.error ? resolveBinding(node.error as StringOrPath, dm) : '';
+      const valueText = node.value ? resolveBinding(node.value as StringOrPath, dm) : undefined;
+      const onChange = node.onChange as any;
+
+      const fieldProps: any = {
+        key: id,
+        label,
+        type: (node.type as string) || 'text',
+        helperText,
+        error: errorText,
+        required: node.required || false,
+        disabled: node.disabled || false,
+      };
+
+      if (onChange) {
+        fieldProps.value = valueText || '';
+        fieldProps.onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+          onAction?.({
+            ...onChange,
+            value: e.target.value,
+            updateDataModel: onChange.dataPath ? { [onChange.dataPath]: e.target.value } : undefined,
+          });
+        };
+      } else if (valueText !== undefined) {
+        fieldProps.defaultValue = valueText;
+      }
+
+      return React.createElement(TextField, fieldProps);
+    }
+
+    case 'SearchField': {
+      const value = resolveBinding(node.value as StringOrPath, dm);
+      const onChange = node.onChange as any;
+      return React.createElement(SearchField, {
+        key: id,
+        value,
+        onChange: (newValue: string) => {
+          onAction?.({
+            ...onChange,
+            value: newValue,
+            updateDataModel: onChange?.dataPath ? { [onChange.dataPath]: newValue } : undefined,
+          });
+        },
+        suggestions: node.suggestions as any,
+        showRecentSearches: node.showRecentSearches as boolean,
+        recentSearches: node.recentSearches as string[],
+        onSuggestionSelect: node.onSuggestionSelect ? (s: any) => onAction?.(node.onSuggestionSelect) : undefined,
+        onClearRecentSearches: node.onClearRecentSearches ? () => onAction?.(node.onClearRecentSearches) : undefined,
+        debounceMs: (node.debounceMs as number) || 300,
+        placeholder: (node.placeholder as string) || 'Search...',
+        disabled: node.disabled || false,
+        loading: node.loading || false,
+      });
+    }
+
+    case 'NumberField': {
+      const label = resolveBinding(node.label as StringOrPath, dm);
+      const helperText = node.helperText ? resolveBinding(node.helperText as StringOrPath, dm) : '';
+      const errorText = node.error ? resolveBinding(node.error as StringOrPath, dm) : '';
+      const valueText = node.value ? resolveBinding(node.value as StringOrPath, dm) : undefined;
+      const onChange = node.onChange as any;
+
+      const fieldProps: Record<string, any> = {
+        key: id,
+        label,
+        helperText,
+        error: errorText,
+        min: node.min as number,
+        max: node.max as number,
+        step: node.step as number,
+        required: node.required || false,
+        disabled: node.disabled || false,
+      };
+
+      if (onChange) {
+        fieldProps.value = valueText !== undefined ? Number(valueText) : undefined;
+        fieldProps.onChange = (newValue: number) => {
+          onAction?.({
+            ...onChange,
+            value: newValue,
+            updateDataModel: onChange.dataPath ? { [onChange.dataPath]: newValue } : undefined,
+          });
+        };
+      } else if (valueText !== undefined) {
+        fieldProps.defaultValue = Number(valueText);
+      }
+
+      return React.createElement(NumberInput, fieldProps);
+    }
+
+    case 'Select': {
+      const label = resolveBinding(node.label as StringOrPath, dm);
+      const valueText = node.value ? resolveBinding(node.value as StringOrPath, dm) : '';
+      const options = ((node.options as any[]) || []).map((opt: any) => ({
+        id: opt.value,
+        value: opt.value,
+        label: opt.label,
+      }));
+      const onChange = node.onChange as any;
+
+      return React.createElement(Dropdown, {
+        key: id,
+        label,
+        value: valueText,
+        options,
+        placeholder: (node.placeholder as string) || 'Select...',
+        disabled: node.disabled || false,
+        onChange: onChange ? (selectedValue: string) => {
+          onAction?.({
+            ...onChange,
+            value: selectedValue,
+            updateDataModel: onChange.dataPath ? { [onChange.dataPath]: selectedValue } : undefined,
+          });
         } : () => {},
-      },
-      text
-    );
-  }
-
-  if ('Card' in component) {
-    const { title, excerpt, subtitle, labels, onClick } = component.Card;
-    const titleText = resolveDataBinding(title, surface.dataModel);
-    const excerptText = excerpt ? resolveDataBinding(excerpt, surface.dataModel) : '';
-    const subtitleText = subtitle ? resolveDataBinding(subtitle, surface.dataModel) : '';
-    
-    return React.createElement(
-      CardLarge,
-      {
-        key: node.id,
-        title: titleText,
-        excerpt: excerptText,
-        subtitle: subtitleText,
-        labels,
-        picture: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23e9ecef" width="100" height="100"/%3E%3C/svg%3E', // Placeholder SVG
-      }
-    );
-  }
-
-  if ('List' in component) {
-    const { dividers = true, spacing = 'comfortable' } = component.List;
-    
-    return React.createElement(
-      List,
-      {
-        key: node.id,
-        dividers,
-        spacing,
-        children: childElements,
-      }
-    );
-  }
-
-  if ('ListItem' in component) {
-    const { primary, secondary, badge, interactive = false, onClick } = component.ListItem;
-    const primaryText = resolveDataBinding(primary, surface.dataModel);
-    const secondaryText = secondary ? resolveDataBinding(secondary, surface.dataModel) : undefined;
-    
-    // If badge is specified, it's a component ID - render it
-    let badgeElement;
-    if (badge) {
-      const badgeNode = surface.components.get(badge);
-      badgeElement = badgeNode ? renderNode(badgeNode, surface, onAction) : undefined;
+      });
     }
-    
-    return React.createElement(
-      ListItem,
-      {
-        key: node.id,
-        primary: primaryText,
-        secondary: secondaryText || '',
+
+    case 'Checkbox': {
+      const label = resolveBinding(node.label as StringOrPath, dm);
+      const onChange = node.onChange as any;
+      return React.createElement(Checkbox, {
+        key: id,
+        label,
+        checked: node.checked || false,
+        disabled: node.disabled || false,
+        onChange: onChange ? (event: React.ChangeEvent<HTMLInputElement>) => {
+          const isChecked = event.target.checked;
+          onAction?.({
+            ...onChange,
+            value: isChecked,
+            updateDataModel: onChange.dataPath ? { [onChange.dataPath]: isChecked } : undefined,
+          });
+        } : undefined,
+      });
+    }
+
+    // ── Interactive ───────────────────────────────────────────────────
+    case 'Button': {
+      const label = resolveBinding(node.label as StringOrPath, dm);
+      const action = (node.action || node.onClick) as any;
+      return React.createElement(Button, {
+        key: id,
+        variant: node.variant || 'primary',
+        size: node.size || 'medium',
+        disabled: node.disabled || false,
+        onClick: action ? () => onAction?.(action) : undefined,
+        children: label,
+      });
+    }
+
+    case 'Chip': {
+      const text = resolveBinding(node.content as StringOrPath, dm);
+      return React.createElement(Chip, {
+        key: id,
+        variant: node.variant || 'default',
+        size: node.size || 'medium',
+        onClick: node.onClick ? () => onAction?.(node.onClick) : undefined,
+      }, text);
+    }
+
+    case 'FilterChip': {
+      const text = resolveBinding(node.content as StringOrPath, dm);
+      return React.createElement(FilterChip, {
+        key: id,
+        selected: node.selected || false,
+        onDismiss: node.onDismiss ? () => onAction?.(node.onDismiss) : () => {},
+      }, text);
+    }
+
+    case 'BooleanChip': {
+      const text = resolveBinding(node.content as StringOrPath, dm);
+      const onClick = node.onClick as any;
+      return React.createElement(BooleanChip, {
+        key: id,
+        selected: node.selected || false,
+        onClick: onClick ? () => {
+          onAction?.({
+            ...onClick,
+            value: !node.selected,
+            updateDataModel: onClick.dataPath ? { [onClick.dataPath]: !node.selected } : undefined,
+          });
+        } : () => {},
+      }, text);
+    }
+
+    case 'TabBar': {
+      const activeTabValue = typeof node.activeTab === 'string'
+        ? node.activeTab
+        : resolveBinding(node.activeTab as StringOrPath, dm);
+      const onTabChange = node.onTabChange as any;
+      return React.createElement(TabBar, {
+        key: id,
+        tabs: node.tabs as any[],
+        activeTab: activeTabValue,
+        onTabChange: (tabId: string) => {
+          onAction?.({
+            ...onTabChange,
+            value: tabId,
+            updateDataModel: onTabChange?.dataPath ? { [onTabChange.dataPath]: tabId } : undefined,
+          });
+        },
+        variant: node.variant || 'default',
+      });
+    }
+
+    // ── Cards & Lists ─────────────────────────────────────────────────
+    case 'Card': {
+      const title = resolveBinding(node.title as StringOrPath, dm);
+      const excerpt = node.excerpt ? resolveBinding(node.excerpt as StringOrPath, dm) : '';
+      const subtitle = node.subtitle ? resolveBinding(node.subtitle as StringOrPath, dm) : '';
+      // v0.9 Card with children support
+      if (childElements.length > 0) {
+        return React.createElement(CardLarge, {
+          key: id,
+          title,
+          excerpt,
+          subtitle,
+          labels: node.labels as string[],
+          picture: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23e9ecef" width="100" height="100"/%3E%3C/svg%3E',
+        }, ...childElements);
+      }
+      return React.createElement(CardLarge, {
+        key: id,
+        title,
+        excerpt,
+        subtitle,
+        labels: node.labels as string[],
+        picture: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23e9ecef" width="100" height="100"/%3E%3C/svg%3E',
+      });
+    }
+
+    case 'List': {
+      return React.createElement(List, {
+        key: id,
+        dividers: node.dividers !== false,
+        spacing: node.spacing || 'comfortable',
+        children: childElements,
+      });
+    }
+
+    case 'ListItem': {
+      const primary = resolveBinding(node.primary as StringOrPath, dm);
+      const secondary = node.secondary ? resolveBinding(node.secondary as StringOrPath, dm) : '';
+      let badgeElement;
+      if (node.badge) {
+        const badgeNode = surface.components.get(node.badge as string);
+        badgeElement = badgeNode ? renderNode(badgeNode, surface, onAction, depth + 1) : undefined;
+      }
+      return React.createElement(ListItem, {
+        key: id,
+        primary,
+        secondary,
         badge: badgeElement,
-        interactive,
-        onClick: onClick ? () => onAction?.(onClick) : undefined,
-      },
-      ...childElements
-    );
-  }
-
-  if ('Stack' in component) {
-    const { direction, gap = 'md' } = component.Stack;
-    // Note: Common Origin Stack doesn't have align prop in current version
-    
-    return React.createElement(
-      Stack,
-      {
-        key: node.id,
-        direction,
-        gap,
-        children: childElements,
-      }
-    );
-  }
-
-  if ('Alert' in component) {
-    const { content, variant = 'info', title } = component.Alert;
-    const contentText = resolveDataBinding(content, surface.dataModel);
-    const titleText = title ? resolveDataBinding(title, surface.dataModel) : undefined;
-    
-    return React.createElement(
-      Alert,
-      {
-        key: node.id,
-        variant,
-        title: titleText || '',
-        children: contentText,
-      }
-    );
-  }
-
-  if ('Divider' in component) {
-    const { orientation = 'horizontal' } = component.Divider;
-    
-    return React.createElement(Divider, {
-      key: node.id,
-      orientation,
-    });
-  }
-
-  if ('Skeleton' in component) {
-    const { variant = 'rect', width = '100%', height = '20px', count = 1 } = component.Skeleton;
-    
-    return renderSkeleton(variant, width, height, count, node.id);
-  }
-
-  if ('Select' in component) {
-    const { label, value, options, placeholder, required = false, disabled = false, onChange } = component.Select;
-    const labelText = resolveDataBinding(label, surface.dataModel);
-    const valueText = value ? resolveDataBinding(value, surface.dataModel) : undefined;
-    
-    // Map options to include required 'id' field
-    const mappedOptions = options.map(opt => ({
-      id: opt.value,
-      value: opt.value,
-      label: opt.label,
-    }));
-    
-    return React.createElement(Dropdown, {
-      key: node.id,
-      label: labelText,
-      value: valueText || '',
-      options: mappedOptions,
-      placeholder: placeholder || 'Select...',
-      disabled,
-      onChange: onChange ? (selectedValue: string) => {
-        const action = {
-          ...onChange,
-          value: selectedValue,
-          updateDataModel: onChange.dataPath ? { [onChange.dataPath]: selectedValue } : undefined,
-        };
-        onAction?.(action);
-      } : () => {},
-    });
-  }
-
-  if ('NumberField' in component) {
-    const { label, value, helperText, error, min, max, step, required = false, disabled = false, onChange } = component.NumberField;
-    const labelText = resolveDataBinding(label, surface.dataModel);
-    const helperTextValue = helperText ? resolveDataBinding(helperText, surface.dataModel) : undefined;
-    const errorText = error ? resolveDataBinding(error, surface.dataModel) : undefined;
-    const valueText = value ? resolveDataBinding(value, surface.dataModel) : undefined;
-    
-    const fieldProps: Record<string, any> = {
-      key: node.id,
-      label: labelText,
-      helperText: helperTextValue || '',
-      error: errorText || '',
-      min,
-      max,
-      step,
-      required,
-      disabled,
-    };
-    
-    if (onChange) {
-      fieldProps.value = valueText !== undefined ? Number(valueText) : undefined;
-      fieldProps.onChange = (newValue: number) => {
-        const action = {
-          ...onChange,
-          value: newValue,
-          updateDataModel: onChange.dataPath ? { [onChange.dataPath]: newValue } : undefined,
-        };
-        onAction?.(action);
-      };
-    } else if (valueText !== undefined) {
-      fieldProps.defaultValue = Number(valueText);
+        interactive: node.interactive || false,
+        onClick: node.onClick ? () => onAction?.(node.onClick) : undefined,
+      }, ...childElements);
     }
-    
-    return React.createElement(NumberInput, fieldProps);
-  }
 
-  if ('Checkbox' in component) {
-    const { label, checked = false, disabled = false, onChange } = component.Checkbox;
-    const labelText = resolveDataBinding(label, surface.dataModel);
-    
-    return React.createElement(Checkbox, {
-      key: node.id,
-      label: labelText,
-      checked,
-      disabled,
-      onChange: onChange ? (event: React.ChangeEvent<HTMLInputElement>) => {
-        const isChecked = event.target.checked;
-        const action = {
-          ...onChange,
-          value: isChecked,
-          updateDataModel: onChange.dataPath ? { [onChange.dataPath]: isChecked } : undefined,
-        };
-        onAction?.(action);
-      } : undefined,
-    });
-  }
-
-  if ('Modal' in component) {
-    const { title, open, onClose } = component.Modal;
-    const titleText = resolveDataBinding(title, surface.dataModel);
-    
-    return React.createElement(
-      Sheet,
-      {
-        key: node.id,
-        title: titleText,
-        isOpen: open,
-        onClose: onClose ? () => onAction?.(onClose) : () => {},
-        children: childElements,
-      }
-    );
-  }
-
-  if ('Progress' in component) {
-    const { value, variant = 'linear', size = 'medium', label } = component.Progress;
-    const labelText = label ? resolveDataBinding(label, surface.dataModel) : undefined;
-    
-    if (variant === 'linear') {
-      return React.createElement(
-        'div',
-        { key: node.id, style: { width: '100%' } },
-        labelText && React.createElement(Typography, { variant: 'caption', children: labelText }),
-        React.createElement(ProgressBar, {
-          value,
-        })
-      );
-    }
-    // For circular variant, use ProgressBar with appropriate styling
-    return React.createElement(ProgressBar, {
-      key: node.id,
-      value,
-    });
-  }
-
-  // Banking Components - Phase 1 (Critical)
-  
-  if ('MoneyDisplay' in component) {
-    const { 
-      amount, 
-      currency = 'USD', 
-      variant = 'default', 
-      showSign = false, 
-      size = 'medium', 
-      weight = 'regular', 
-      locale = 'en-US',
-      align = 'left'
-    } = component.MoneyDisplay;
-    
-    const amountValue = typeof amount === 'number' ? amount : parseFloat(resolveDataBinding(amount, surface.dataModel));
-    
-    return React.createElement(MoneyDisplay, {
-      key: node.id,
-      amount: amountValue,
-      currency,
-      variant,
-      showSign,
-      size,
-      weight,
-      locale,
-      align,
-    });
-  }
-
-  if ('TransactionListItem' in component) {
-    const { 
-      merchant, 
-      amount, 
-      date, 
-      status, 
-      category, 
-      merchantLogo, 
-      description, 
-      hasReceipt, 
-      hasNote, 
-      currency = 'USD', 
-      onClick 
-    } = component.TransactionListItem;
-    
-    const merchantText = resolveDataBinding(merchant, surface.dataModel);
-    const amountValue = typeof amount === 'number' ? amount : parseFloat(resolveDataBinding(amount, surface.dataModel));
-    const dateValue = resolveDataBinding(date, surface.dataModel);
-    const descriptionText = description ? resolveDataBinding(description, surface.dataModel) : undefined;
-    
-    return React.createElement(TransactionListItem, {
-      key: node.id,
-      merchant: merchantText,
-      amount: amountValue,
-      date: dateValue,
-      status,
-      category,
-      merchantLogo,
-      description: descriptionText,
-      hasReceipt,
-      hasNote,
-      currency,
-      onClick: onClick ? () => onAction?.(onClick) : undefined,
-    });
-  }
-
-  if ('AccountCard' in component) {
-    const { 
-      accountType, 
-      accountName, 
-      balance, 
-      accountNumber, 
-      trend, 
-      trendValue, 
-      action, 
-      secondaryAction, 
-      currency = 'USD', 
-      onClick 
-    } = component.AccountCard;
-    
-    const accountNameText = resolveDataBinding(accountName, surface.dataModel);
-    const balanceValue = typeof balance === 'number' ? balance : parseFloat(resolveDataBinding(balance, surface.dataModel));
-    const trendValueText = trendValue ? resolveDataBinding(trendValue, surface.dataModel) : undefined;
-    
-    return React.createElement(AccountCard, {
-      key: node.id,
-      accountType,
-      accountName: accountNameText,
-      balance: balanceValue,
-      accountNumber,
-      trend,
-      trendValue: trendValueText,
-      action: action ? {
-        label: action.label,
-        onClick: () => onAction?.(action.onClick),
-        icon: action.icon as any,
-        variant: action.variant,
-      } : undefined,
-      secondaryAction: secondaryAction ? {
-        label: secondaryAction.label,
-        onClick: () => onAction?.(secondaryAction.onClick),
-        icon: secondaryAction.icon as any,
-        variant: secondaryAction.variant,
-      } : undefined,
-      currency,
-      onClick: onClick ? () => onAction?.(onClick) : undefined,
-    });
-  }
-
-  if ('DateGroup' in component) {
-    const { 
-      date, 
-      format = 'medium', 
-      showTotal = false, 
-      totalAmount, 
-      showCount = false, 
-      count, 
-      sticky = false, 
-      currency = 'USD' 
-    } = component.DateGroup;
-    
-    const dateValue = resolveDataBinding(date, surface.dataModel);
-    const totalAmountValue = totalAmount !== undefined 
-      ? (typeof totalAmount === 'number' ? totalAmount : parseFloat(resolveDataBinding(totalAmount, surface.dataModel)))
-      : undefined;
-    const countValue = count !== undefined 
-      ? (typeof count === 'number' ? count : parseInt(resolveDataBinding(count, surface.dataModel)))
-      : undefined;
-    
-    return React.createElement(
-      DateGroup,
-      {
-        key: node.id,
+    case 'DateGroup': {
+      const dateValue = resolveBinding(node.date as StringOrPath, dm);
+      const totalAmount = node.totalAmount !== undefined ? resolveNumber(node.totalAmount as NumberOrPath, dm) : undefined;
+      const count = node.count !== undefined
+        ? (typeof node.count === 'number' ? node.count : parseInt(resolveBinding(node.count as StringOrPath, dm)))
+        : undefined;
+      return React.createElement(DateGroup, {
+        key: id,
         date: dateValue,
-        format: format as any,
-        showTotal,
-        totalAmount: totalAmountValue,
-        showCount,
-        count: countValue,
-        sticky,
-        currency,
+        format: (node.format as any) || 'medium',
+        showTotal: node.showTotal || false,
+        totalAmount,
+        showCount: node.showCount || false,
+        count,
+        sticky: node.sticky || false,
+        currency: (node.currency as string) || 'AUD',
         children: childElements,
-      }
-    );
-  }
+      });
+    }
 
-  if ('EmptyState' in component) {
-    const { 
-      illustration, 
-      title, 
-      description, 
-      action, 
-      secondaryAction, 
-      variant = 'default', 
-      size = 'medium' 
-    } = component.EmptyState;
-    
-    const titleText = resolveDataBinding(title, surface.dataModel);
-    const descriptionText = resolveDataBinding(description, surface.dataModel);
-    
-    return React.createElement(EmptyState, {
-      key: node.id,
-      illustration,
-      title: titleText,
-      description: descriptionText,
-      action: action ? {
-        label: action.label,
-        onClick: () => onAction?.(action.onClick),
-        variant: action.variant,
-        icon: action.icon as any,
-      } : undefined,
-      secondaryAction: secondaryAction ? {
-        label: secondaryAction.label,
-        onClick: () => onAction?.(secondaryAction.onClick),
-        variant: secondaryAction.variant,
-        icon: secondaryAction.icon as any,
-      } : undefined,
-      variant,
-      size,
-    });
-  }
+    // ── Banking ───────────────────────────────────────────────────────
+    case 'MoneyDisplay': {
+      const amount = resolveNumber(node.amount as NumberOrPath, dm);
+      return React.createElement(MoneyDisplay, {
+        key: id,
+        amount,
+        currency: node.currency || 'AUD',
+        variant: node.variant || 'default',
+        showSign: node.showSign || false,
+        size: node.size || 'medium',
+        weight: node.weight || 'regular',
+        locale: node.locale || 'en-AU',
+        align: node.align || 'left',
+      });
+    }
 
-  // Banking Components - Phase 2 (High Priority)
-  
-  if ('SearchField' in component) {
-    const { 
-      value, 
-      onChange, 
-      suggestions, 
-      showRecentSearches, 
-      recentSearches, 
-      onSuggestionSelect, 
-      onClearRecentSearches, 
-      debounceMs = 300, 
-      placeholder = 'Search...', 
-      disabled = false, 
-      loading = false 
-    } = component.SearchField;
-    
-    const valueText = resolveDataBinding(value, surface.dataModel);
-    
-    return React.createElement(SearchField, {
-      key: node.id,
-      value: valueText,
-      onChange: (newValue: string) => {
-        const action = {
-          ...onChange,
-          value: newValue,
-          updateDataModel: onChange.dataPath ? { [onChange.dataPath]: newValue } : undefined,
-        };
-        onAction?.(action);
-      },
-      suggestions,
-      showRecentSearches,
-      recentSearches,
-      onSuggestionSelect: onSuggestionSelect ? (suggestion: any) => {
-        const action = {
-          ...onSuggestionSelect,
-          value: typeof suggestion === 'string' ? suggestion : suggestion.id,
-        };
-        onAction?.(action);
-      } : undefined,
-      onClearRecentSearches: onClearRecentSearches ? () => onAction?.(onClearRecentSearches) : undefined,
-      debounceMs,
-      placeholder,
-      disabled,
-      loading,
-    });
-  }
+    case 'TransactionListItem': {
+      const merchant = resolveBinding(node.merchant as StringOrPath, dm);
+      const amount = resolveNumber(node.amount as NumberOrPath, dm);
+      const date = resolveBinding(node.date as StringOrPath, dm);
+      const description = node.description ? resolveBinding(node.description as StringOrPath, dm) : undefined;
+      return React.createElement(TransactionListItem, {
+        key: id,
+        merchant,
+        amount,
+        date,
+        status: node.status,
+        category: node.category,
+        merchantLogo: node.merchantLogo ? sanitizeUrl(node.merchantLogo) : undefined,
+        description,
+        hasReceipt: node.hasReceipt,
+        hasNote: node.hasNote,
+        currency: node.currency || 'AUD',
+        onClick: node.onClick ? () => onAction?.(node.onClick) : undefined,
+      });
+    }
 
-  if ('CategoryBadge' in component) {
-    const { 
-      content, 
-      color = 'blue', 
-      variant = 'filled', 
-      size = 'medium', 
-      icon, 
-      onClick, 
-      disabled = false 
-    } = component.CategoryBadge;
-    
-    const contentText = resolveDataBinding(content, surface.dataModel);
-    
-    return React.createElement(
-      CategoryBadge,
-      {
-        key: node.id,
-        color,
-        variant,
-        size,
-        icon: icon as any,
-        onClick: onClick ? () => onAction?.(onClick) : undefined,
-        disabled,
-        children: contentText,
-      }
-    );
-  }
+    case 'AccountCard': {
+      const accountName = resolveBinding(node.accountName as StringOrPath, dm);
+      const balance = resolveNumber(node.balance as NumberOrPath, dm);
+      const trendValue = node.trendValue ? resolveBinding(node.trendValue as StringOrPath, dm) : undefined;
+      const action = node.action as any;
+      const secondaryAction = node.secondaryAction as any;
+      return React.createElement(AccountCard, {
+        key: id,
+        accountType: node.accountType,
+        accountName,
+        balance,
+        accountNumber: node.accountNumber,
+        trend: node.trend,
+        trendValue,
+        action: action ? {
+          label: action.label,
+          onClick: () => onAction?.(action.onClick),
+          icon: action.icon,
+          variant: action.variant,
+        } : undefined,
+        secondaryAction: secondaryAction ? {
+          label: secondaryAction.label,
+          onClick: () => onAction?.(secondaryAction.onClick),
+          icon: secondaryAction.icon,
+          variant: secondaryAction.variant,
+        } : undefined,
+        currency: node.currency || 'AUD',
+        onClick: node.onClick ? () => onAction?.(node.onClick) : undefined,
+      });
+    }
 
-  if ('StatusBadge' in component) {
-    const { 
-      status, 
-      label, 
-      size = 'medium', 
-      showIcon = true, 
-      liveRegion = true 
-    } = component.StatusBadge;
-    
-    const labelText = label ? resolveDataBinding(label, surface.dataModel) : undefined;
-    
-    return React.createElement(StatusBadge, {
-      key: node.id,
-      status,
-      label: labelText,
-      size,
-      showIcon,
-      liveRegion,
-    });
-  }
+    case 'CategoryBadge': {
+      const text = resolveBinding((node.content || node.label) as StringOrPath, dm);
+      return React.createElement(CategoryBadge, {
+        key: id,
+        color: node.color || 'blue',
+        variant: node.variant || 'filled',
+        size: node.size || 'medium',
+        icon: node.icon as any,
+        onClick: node.onClick ? () => onAction?.(node.onClick) : undefined,
+        disabled: node.disabled || false,
+        children: text,
+      });
+    }
 
-  if ('TabBar' in component) {
-    const { 
-      tabs, 
-      activeTab, 
-      onTabChange, 
-      variant = 'default' 
-    } = component.TabBar;
-    
-    const activeTabValue = typeof activeTab === 'string' ? activeTab : resolveDataBinding(activeTab, surface.dataModel);
-    
-    return React.createElement(TabBar, {
-      key: node.id,
-      tabs,
-      activeTab: activeTabValue,
-      onTabChange: (tabId: string) => {
-        const action = {
-          ...onTabChange,
-          value: tabId,
-          updateDataModel: onTabChange.dataPath ? { [onTabChange.dataPath]: tabId } : undefined,
-        };
-        onAction?.(action);
-      },
-      variant,
-    });
-  }
+    case 'StatusBadge': {
+      const label = node.label ? resolveBinding(node.label as StringOrPath, dm) : undefined;
+      return React.createElement(StatusBadge, {
+        key: id,
+        status: node.status,
+        label,
+        size: node.size || 'medium',
+        showIcon: node.showIcon !== false,
+        liveRegion: node.liveRegion !== false,
+      });
+    }
 
-  if ('ActionSheet' in component) {
-    const { 
-      isOpen, 
-      onClose, 
-      title, 
-      description, 
-      actions, 
-      closeOnOverlayClick = true, 
-      closeOnEscape = true, 
-      showCloseButton = true 
-    } = component.ActionSheet;
-    
-    const titleText = title ? resolveDataBinding(title, surface.dataModel) : undefined;
-    const descriptionText = description ? resolveDataBinding(description, surface.dataModel) : undefined;
-    
-    return React.createElement(ActionSheet, {
-      key: node.id,
-      isOpen,
-      onClose: () => onAction?.(onClose),
-      title: titleText,
-      description: descriptionText,
-      actions: actions.map(action => ({
+    // ── Modals ────────────────────────────────────────────────────────
+    case 'Modal': {
+      const title = resolveBinding(node.title as StringOrPath, dm);
+      return React.createElement(Sheet, {
+        key: id,
+        title,
+        isOpen: node.open as boolean,
+        onClose: node.onClose ? () => onAction?.(node.onClose) : () => {},
+        children: childElements,
+      });
+    }
+
+    case 'ActionSheet': {
+      const title = node.title ? resolveBinding(node.title as StringOrPath, dm) : undefined;
+      const description = node.description ? resolveBinding(node.description as StringOrPath, dm) : undefined;
+      const actions = ((node.actions as any[]) || []).map((action: any) => ({
         id: action.id,
         label: action.label,
-        icon: action.icon as any,
+        icon: action.icon,
         destructive: action.destructive,
         disabled: action.disabled,
         onSelect: () => onAction?.(action.onSelect),
-      })),
-      closeOnOverlayClick,
-      closeOnEscape,
-      showCloseButton,
-    });
-  }
+      }));
+      return React.createElement(ActionSheet, {
+        key: id,
+        isOpen: node.isOpen as boolean,
+        onClose: () => onAction?.(node.onClose),
+        title,
+        description,
+        actions,
+        closeOnOverlayClick: node.closeOnOverlayClick !== false,
+        closeOnEscape: node.closeOnEscape !== false,
+        showCloseButton: node.showCloseButton !== false,
+      });
+    }
 
-  return null;
+    // ── Utility ───────────────────────────────────────────────────────
+    case 'Progress': {
+      const label = node.label ? resolveBinding(node.label as StringOrPath, dm) : undefined;
+      const value = (node.value as number) || 0;
+      const variant = (node.variant as string) || 'linear';
+      if (variant === 'linear') {
+        return React.createElement(
+          'div',
+          { key: id, style: { width: '100%' } },
+          label && React.createElement(Typography, { variant: 'caption', children: label }),
+          React.createElement(ProgressBar, { value })
+        );
+      }
+      return React.createElement(ProgressBar, { key: id, value });
+    }
+
+    case 'Skeleton': {
+      return renderSkeleton(
+        node.variant || 'rect',
+        node.width || '100%',
+        node.height || '20px',
+        node.count || 1,
+        id
+      );
+    }
+
+    default:
+      return null;
+  }
 }
 
 /**
- * Validate that a component reference is in the catalog
+ * Set of valid component type names in this catalog.
  */
-export function isValidComponent(component: CatalogComponent): boolean {
-  const validTypes = [
-    'Text',
-    'Button',
-    'TextField',
-    'Chip',
-    'FilterChip',
-    'BooleanChip',
-    'Card',
-    'List',
-    'ListItem',
-    'Stack',
-    'Alert',
-    'Divider',
-    'Skeleton',
-    'Select',
-    'NumberField',
-    'Checkbox',
-    'Modal',
-    'Progress',
-    // Banking Components - Phase 1 (Critical)
-    'MoneyDisplay',
-    'TransactionListItem',
-    'AccountCard',
-    'DateGroup',
-    'EmptyState',
-    // Banking Components - Phase 2 (High Priority)
-    'SearchField',
-    'CategoryBadge',
-    'StatusBadge',
-    'TabBar',
-    'ActionSheet',
-  ];
-  
-  return validTypes.some((type) => type in component);
+export const VALID_COMPONENT_TYPES = new Set([
+  'Text',
+  'Button',
+  'TextField',
+  'Chip',
+  'FilterChip',
+  'BooleanChip',
+  'Card',
+  'List',
+  'ListItem',
+  'Stack',
+  'Alert',
+  'Divider',
+  'Skeleton',
+  'Select',
+  'NumberField',
+  'Checkbox',
+  'Modal',
+  'Progress',
+  // Banking Components - Phase 1
+  'MoneyDisplay',
+  'TransactionListItem',
+  'AccountCard',
+  'DateGroup',
+  'EmptyState',
+  // Banking Components - Phase 2
+  'SearchField',
+  'CategoryBadge',
+  'StatusBadge',
+  'TabBar',
+  'ActionSheet',
+]);
+
+/**
+ * Validate that a component type name is in the catalog.
+ * v0.9: accepts a string (the component type name).
+ * Also accepts legacy v0.8 object format for backward compat.
+ */
+export function isValidComponent(component: unknown): boolean {
+  // v0.9: string discriminator
+  if (typeof component === 'string') {
+    return VALID_COMPONENT_TYPES.has(component);
+  }
+  // Legacy v0.8: { Text: {...} }
+  if (component && typeof component === 'object') {
+    return Object.keys(component).some((key) => VALID_COMPONENT_TYPES.has(key));
+  }
+  return false;
 }
 
 /**
@@ -838,7 +713,7 @@ export function isValidComponent(component: CatalogComponent): boolean {
 export function getCatalogMetadata() {
   return {
     catalogId: CATALOG_ID,
-    version: '2.3',
+    version: '2.4',
     components: [
       { name: 'Text', description: 'Render text with typography variants' },
       { name: 'Button', description: 'Interactive button with variants' },

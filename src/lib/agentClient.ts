@@ -1,6 +1,6 @@
 /**
  * Agent Client
- * 
+ *
  * Unified interface for calling banking agents (mock or real Gemini AI).
  * Automatically routes to the appropriate agent based on NEXT_PUBLIC_AGENT_MODE.
  */
@@ -9,6 +9,10 @@ import type { A2UIMessage } from '@/src/a2ui/types';
 import { streamTransactionFinderUI } from '@/src/server/mockAgent';
 import { streamSpendingSummaryUI } from '@/src/server/spendingSummaryAgent';
 import { streamFundTransferUI } from '@/src/server/fundTransferAgent';
+import { createLogger, truncate } from '@/src/lib/logger';
+import { validateA2UIMessage } from '@/src/lib/messageValidator';
+
+const log = createLogger('Agent');
 
 /**
  * Agent mode configuration
@@ -28,123 +32,116 @@ export async function callRealAgent(
   scenario?: string
 ): Promise<void> {
   let messageCount = 0;
-  
+
   try {
-    console.log('[Real Agent] Calling API with query:', query);
-    
-    // Call the API route with streaming
+    log.info('Calling API', { query: truncate(query, 80), scenario });
+
     const response = await fetch('/api/agent', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, scenario }),
     });
 
-    // Check for HTTP errors
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       throw new Error(errorData.message || errorData.error || `HTTP ${response.status}`);
     }
 
-    // Check that we have a body to read
     if (!response.body) {
       throw new Error('No response body received from agent');
     }
 
-    console.log('[Real Agent] Streaming response started');
+    log.debug('Streaming response started');
 
-    // Process the streaming response
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    let rawChunks: string[] = [];
 
     try {
       while (true) {
         const { done, value } = await reader.read();
-        
-        if (done) {
-          break;
-        }
+        if (done) break;
 
-        // Decode the chunk and add to buffer
         const chunk = decoder.decode(value, { stream: true });
-        rawChunks.push(chunk);
-        console.log('[Real Agent] Received chunk (length:', chunk.length, '):', chunk.substring(0, 200));
-        console.log('[Real Agent] Chunk contains', (chunk.match(/\n/g) || []).length, 'newlines');
         buffer += chunk;
 
-        // Split by newlines to extract complete JSONL lines
+        // Extract complete lines
         const lines = buffer.split('\n');
-        console.log('[Real Agent] Split buffer into', lines.length, 'lines');
-        
-        // Keep the last incomplete line in the buffer
         buffer = lines.pop() || '';
-        console.log('[Real Agent] Remaining buffer length:', buffer.length);
 
-        // Process each complete line
         for (const line of lines) {
-          const trimmedLine = line.trim();
-          
-          if (trimmedLine) {
-            try {
-              const message = JSON.parse(trimmedLine) as A2UIMessage;
-              messageCount++;
-              
-              // Log what type of message we received
-              const messageType = Object.keys(message)[0];
-              console.log(`[Real Agent] Received message ${messageCount}:`, messageType);
-              console.log(`[Real Agent] Full message:`, message);
-              
-              // Check if it's an error message
-              if ('error' in message) {
-                console.error('Agent error:', message.error);
-                throw new Error((message.error as any).message || 'Agent error');
-              }
-              
-              // Send valid A2UI message to callback
-              console.log(`[Real Agent] Sending message ${messageCount} to onMessage callback`);
-              onMessage(message);
-            } catch (parseError) {
-              console.error('[Real Agent] Failed to parse message:', trimmedLine.substring(0, 200));
-              console.error('Parse error:', parseError);
-              // Continue processing other messages
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          try {
+            const parsed = JSON.parse(trimmed);
+
+            // Check for error messages from the stream
+            if ('error' in parsed) {
+              log.error('Agent returned error message', { error: parsed.error });
+              throw new Error(parsed.error?.message || 'Agent error');
+            }
+
+            // Validate against A2UI schema + catalog
+            const validation = validateA2UIMessage(parsed);
+            if (!validation.valid) {
+              log.warn('Invalid A2UI message, skipping', { errors: validation.errors, preview: truncate(trimmed, 120) });
+              continue;
+            }
+            if (validation.warnings && validation.warnings.length > 0) {
+              log.warn('A2UI catalog warnings', { count: validation.warnings.length, warnings: validation.warnings.slice(0, 5) });
+            }
+
+            messageCount++;
+            const messageType = Object.keys(validation.message!)[0];
+            log.debug(`Message ${messageCount}: ${messageType}`);
+            onMessage(validation.message!);
+          } catch (parseError) {
+            if (parseError instanceof SyntaxError) {
+              log.warn('Invalid JSON line, skipping', { preview: truncate(trimmed, 200) });
+            } else {
+              throw parseError; // Re-throw non-parse errors (like the agent error above)
             }
           }
         }
       }
 
-      // Process any remaining content in the buffer
+      // Process remaining buffer
       if (buffer.trim()) {
         try {
-          const message = JSON.parse(buffer.trim()) as A2UIMessage;
-          messageCount++;
-          
-          const messageType = Object.keys(message)[0];
-          console.log(`[Real Agent] Received final message ${messageCount}:`, messageType);
-          
-          if ('error' in message) {
-            console.error('Agent error:', message.error);
-            throw new Error((message.error as any).message || 'Agent error');
+          const parsed = JSON.parse(buffer.trim());
+
+          if ('error' in parsed) {
+            throw new Error(parsed.error?.message || 'Agent error');
           }
-          
-          onMessage(message);
+
+          const validation = validateA2UIMessage(parsed);
+          if (validation.valid) {
+            messageCount++;
+            log.debug(`Final message ${messageCount}: ${Object.keys(validation.message!)[0]}`);
+            onMessage(validation.message!);
+          } else {
+            log.warn('Invalid final A2UI message', { errors: validation.errors });
+          }
         } catch (parseError) {
-          console.error('[Real Agent] Failed to parse final buffer:', buffer.substring(0, 200));
+          if (parseError instanceof SyntaxError) {
+            log.warn('Failed to parse final buffer', { preview: truncate(buffer, 200) });
+          } else {
+            throw parseError;
+          }
         }
       }
-      
-      console.log(`[Real Agent] Completed. Total messages: ${messageCount}`);
-      
+
+      log.info('Completed', { totalMessages: messageCount });
+
       if (messageCount === 0) {
-        console.warn('[Real Agent] No messages received! Raw response:', rawChunks.join('').substring(0, 500));
+        log.error('No valid messages received from Gemini');
       }
     } finally {
       reader.releaseLock();
     }
   } catch (error) {
-    console.error('[Real Agent] Call failed:', error);
+    log.error('Call failed', { error: error instanceof Error ? error.message : String(error) });
     throw error;
   }
 }
@@ -182,7 +179,7 @@ export async function callMockAgent(
         break;
     }
   } catch (error) {
-    console.error('Mock agent call failed:', error);
+    log.error('Mock agent call failed', { error: error instanceof Error ? error.message : String(error) });
     throw error;
   }
 }
@@ -211,17 +208,15 @@ export async function callAgent(
 
   try {
     if (mode === 'real') {
-      // Call real Gemini agent
-      console.log(`[Agent] Using real Gemini agent for: "${query}"`);
+      log.info('Using real Gemini agent', { query: truncate(query, 60), scenario });
       await callRealAgent(query, onMessage, scenario);
     } else {
-      // Call mock agent
-      console.log(`[Agent] Using mock agent for: "${query}" (scenario: ${scenario})`);
+      log.info('Using mock agent', { query: truncate(query, 60), scenario });
       await callMockAgent(query, onMessage, scenario);
     }
   } catch (error) {
     const err = error instanceof Error ? error : new Error('Unknown error');
-    console.error('[Agent] Error:', err.message);
+    log.error('Agent error', { message: err.message, mode });
 
     // Call custom error handler if provided
     if (options?.onError) {
@@ -230,11 +225,11 @@ export async function callAgent(
 
     // Retry with mock agent if real agent failed and retry is enabled
     if (mode === 'real' && retryWithMock) {
-      console.log('[Agent] Falling back to mock agent after real agent failure');
+      log.warn('Falling back to mock agent after real agent failure');
       try {
         await callMockAgent(query, onMessage, scenario);
       } catch (mockError) {
-        console.error('[Agent] Mock agent fallback also failed:', mockError);
+        log.error('Mock agent fallback also failed', { error: mockError instanceof Error ? mockError.message : String(mockError) });
         throw mockError;
       }
     } else {

@@ -33,7 +33,7 @@ export function analyzeQuery(query: string): QueryAnalysis {
     /recent.*transaction/i,
     /list.*transaction/i,
     /transaction.*from/i,
-    /\b(starbucks|amazon|netflix|whole foods|shell)\b/i,
+    /\b(woolworths|coles|bunnings|jb hi-?fi|kmart|caltex|netflix|the coffee club|aldi|officeworks)\b/i,
   ];
 
   // Spending summary patterns
@@ -79,14 +79,14 @@ export function analyzeQuery(query: string): QueryAnalysis {
   // Extract entities
   const entities: QueryAnalysis['entities'] = {};
 
-  // Extract merchant name
-  const merchantMatch = lowerQuery.match(/\b(starbucks|amazon|netflix|whole foods|shell|target|walmart|costco)\b/i);
+  // Extract merchant name (Australian retailers)
+  const merchantMatch = lowerQuery.match(/\b(woolworths|coles|bunnings|jb hi-?fi|kmart|caltex|netflix|the coffee club|aldi|officeworks|big w|myer|dan murphy'?s|ampol)\b/i);
   if (merchantMatch) {
     entities.merchant = merchantMatch[1];
   }
 
   // Extract category
-  const categoryMatch = lowerQuery.match(/\b(groceries|food|entertainment|transportation|shopping|dining)\b/i);
+  const categoryMatch = lowerQuery.match(/\b(groceries|food|entertainment|transport(?:ation)?|shopping|dining|bills|utilities|health)\b/i);
   if (categoryMatch) {
     entities.category = categoryMatch[1];
   }
@@ -120,7 +120,7 @@ export function analyzeQuery(query: string): QueryAnalysis {
  */
 export function getUnknownQueryResponse(): string {
   return `I can help you with:
-• Finding transactions (e.g., "Show my Starbucks transactions")
+• Finding transactions (e.g., "Show my Woolworths transactions")
 • Viewing spending summaries (e.g., "How much did I spend last month?")
 • Transferring money (e.g., "Transfer $100 to savings")
 

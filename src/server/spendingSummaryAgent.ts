@@ -1,7 +1,7 @@
 /**
- * Spending Summary Mock Agent
- * 
- * Generates A2UI messages for a spending summary UI showing:
+ * Spending Summary Mock Agent — v0.9
+ *
+ * Generates A2UI v0.9 messages for a spending summary UI showing:
  * - Total spending for a period
  * - Category breakdown with amounts
  * - Visual representation (cards/list)
@@ -9,68 +9,44 @@
  */
 
 import type { A2UIMessage } from '../a2ui/types';
+import { CATALOG_ID } from '../a2ui/constants';
 
 /**
  * Spending data by category - Australian context
  */
 const SPENDING_DATA = [
-  {
-    category: 'Groceries',
-    amount: 487.23,
-    percentage: 28,
-    trend: 'up',
-    transactions: 12,
-  },
-  {
-    category: 'Transport',
-    amount: 342.50,
-    percentage: 20,
-    trend: 'down',
-    transactions: 8,
-  },
-  {
-    category: 'Entertainment',
-    amount: 215.99,
-    percentage: 12,
-    trend: 'up',
-    transactions: 6,
-  },
-  {
-    category: 'Dining',
-    amount: 389.45,
-    percentage: 23,
-    trend: 'up',
-    transactions: 15,
-  },
-  {
-    category: 'Shopping',
-    amount: 298.67,
-    percentage: 17,
-    trend: 'same',
-    transactions: 5,
-  },
+  { category: 'Groceries', amount: 487.23, percentage: 28, trend: 'up', transactions: 12 },
+  { category: 'Transport', amount: 342.50, percentage: 20, trend: 'down', transactions: 8 },
+  { category: 'Entertainment', amount: 215.99, percentage: 12, trend: 'up', transactions: 6 },
+  { category: 'Dining', amount: 389.45, percentage: 23, trend: 'up', transactions: 15 },
+  { category: 'Shopping', amount: 298.67, percentage: 17, trend: 'same', transactions: 5 },
 ];
 
 const TOTAL_SPENDING = SPENDING_DATA.reduce((sum, cat) => sum + cat.amount, 0);
 
 /**
- * Generate spending summary UI messages
+ * Generate spending summary UI messages (v0.9)
  */
 export function getSpendingSummaryMessages(): A2UIMessage[] {
   return [
+    // createSurface must be first
+    {
+      createSurface: {
+        surfaceId: 'main',
+        catalogId: CATALOG_ID,
+      },
+    },
+
     // Root container
     {
-      surfaceUpdate: {
+      updateComponents: {
         surfaceId: 'main',
         components: [
           {
             id: 'root',
-            component: {
-              Stack: {
-                direction: 'column',
-                gap: 'lg',
-              },
-            },
+            component: 'Stack',
+            direction: 'column',
+            gap: 'lg',
             children: ['header', 'total-card', 'category-list'],
           },
         ],
@@ -79,66 +55,51 @@ export function getSpendingSummaryMessages(): A2UIMessage[] {
 
     // Header
     {
-      surfaceUpdate: {
+      updateComponents: {
         surfaceId: 'main',
         components: [
           {
             id: 'header',
-            component: {
-              Text: {
-                text: { literalString: 'Spending summary' },
-                variant: 'h1',
-              },
-            },
+            component: 'Text',
+            text: 'Spending summary',
+            variant: 'h1',
           },
         ],
       },
     },
 
-    // Total spending card - use MoneyDisplay instead of formatted string
+    // Total spending card
     {
-      surfaceUpdate: {
+      updateComponents: {
         surfaceId: 'main',
         components: [
           {
             id: 'total-card',
-            component: {
-              Stack: {
-                direction: 'column',
-                gap: 'sm',
-              },
-            },
+            component: 'Stack',
+            direction: 'column',
+            gap: 'sm',
             children: ['total-label', 'total-amount', 'total-period'],
           },
           {
             id: 'total-label',
-            component: {
-              Text: {
-                text: { literalString: 'Total spending' },
-                variant: 'caption',
-              },
-            },
+            component: 'Text',
+            text: 'Total spending',
+            variant: 'caption',
           },
           {
             id: 'total-amount',
-            component: {
-              MoneyDisplay: {
-                amount: -TOTAL_SPENDING,
-                currency: 'AUD',
-                variant: 'negative',
-                size: 'xlarge',
-                weight: 'bold',
-              },
-            },
+            component: 'MoneyDisplay',
+            amount: -TOTAL_SPENDING,
+            currency: 'AUD',
+            variant: 'negative',
+            size: 'xlarge',
+            weight: 'bold',
           },
           {
             id: 'total-period',
-            component: {
-              Text: {
-                text: { literalString: 'Last 30 days • 46 transactions' },
-                variant: 'body',
-              },
-            },
+            component: 'Text',
+            text: 'Last 30 days \u2022 46 transactions',
+            variant: 'body',
           },
         ],
       },
@@ -146,45 +107,36 @@ export function getSpendingSummaryMessages(): A2UIMessage[] {
 
     // Category breakdown list
     {
-      surfaceUpdate: {
+      updateComponents: {
         surfaceId: 'main',
         components: [
           {
             id: 'category-list',
-            component: {
-              Stack: {
-                direction: 'column',
-                gap: 'md',
-              },
-            },
+            component: 'Stack',
+            direction: 'column',
+            gap: 'md',
             children: ['category-header', ...SPENDING_DATA.map((_, i) => `category-${i}`)],
           },
           {
             id: 'category-header',
-            component: {
-              Text: {
-                text: { literalString: 'By category' },
-                variant: 'h2',
-              },
-            },
+            component: 'Text',
+            text: 'By category',
+            variant: 'h2',
           },
         ],
       },
     },
 
-    // Category breakdown cards - use MoneyDisplay and Progress
+    // Category breakdown cards
     {
-      surfaceUpdate: {
+      updateComponents: {
         surfaceId: 'main',
         components: SPENDING_DATA.flatMap((cat, index) => [
           {
             id: `category-${index}`,
-            component: {
-              Stack: {
-                direction: 'column',
-                gap: 'sm',
-              },
-            },
+            component: 'Stack' as const,
+            direction: 'column',
+            gap: 'sm',
             children: [
               `cat-${index}-header`,
               `cat-${index}-amount`,
@@ -194,59 +146,36 @@ export function getSpendingSummaryMessages(): A2UIMessage[] {
           },
           {
             id: `cat-${index}-header`,
-            component: {
-              Text: {
-                text: { literalString: cat.category },
-                variant: 'h3',
-              },
-            },
+            component: 'Text' as const,
+            text: cat.category,
+            variant: 'h3',
           },
           {
             id: `cat-${index}-amount`,
-            component: {
-              MoneyDisplay: {
-                amount: -cat.amount,
-                currency: 'AUD',
-                variant: 'negative',
-                size: 'medium',
-                weight: 'bold',
-              },
-            },
+            component: 'MoneyDisplay' as const,
+            amount: -cat.amount,
+            currency: 'AUD',
+            variant: 'negative',
+            size: 'medium',
+            weight: 'bold',
           },
           {
             id: `cat-${index}-progress`,
-            component: {
-              Progress: {
-                value: cat.percentage,
-                variant: 'linear',
-                size: 'medium',
-                label: { literalString: `${cat.percentage}% of total spending` },
-              },
-            },
+            component: 'Progress' as const,
+            value: cat.percentage,
+            variant: 'linear',
+            size: 'medium',
+            label: `${cat.percentage}% of total spending`,
           },
           {
             id: `cat-${index}-details`,
-            component: {
-              Text: {
-                text: {
-                  literalString: `${cat.transactions} transactions • ${
-                    cat.trend === 'up' ? '↑ Higher' : cat.trend === 'down' ? '↓ Lower' : '→ Same'
-                  } than last month`,
-                },
-                variant: 'caption',
-              },
-            },
+            component: 'Text' as const,
+            text: `${cat.transactions} transactions \u2022 ${
+              cat.trend === 'up' ? '\u2191 Higher' : cat.trend === 'down' ? '\u2193 Lower' : '\u2192 Same'
+            } than last month`,
+            variant: 'caption',
           },
         ]),
-      },
-    },
-
-    // Begin rendering
-    {
-      beginRendering: {
-        surfaceId: 'main',
-        root: 'root',
-        catalogId: 'common-origin.design-system:v2.0',
       },
     },
   ];
@@ -256,13 +185,12 @@ export function getSpendingSummaryMessages(): A2UIMessage[] {
  * Stream spending summary UI with delays
  */
 export async function streamSpendingSummaryUI(
-  onMessage: (message: A2UIMessage) => void
+  onMessage: (message: A2UIMessage) => void,
 ): Promise<void> {
   const messages = getSpendingSummaryMessages();
 
   for (const message of messages) {
     onMessage(message);
-    // Simulate streaming delay
     await new Promise((resolve) => setTimeout(resolve, 150));
   }
 }

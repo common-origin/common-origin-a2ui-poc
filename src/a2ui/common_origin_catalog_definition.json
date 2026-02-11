@@ -1,0 +1,752 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "common-origin.design-system:v2.4/catalog_definition.json",
+  "title": "Common Origin Design System – A2UI Component Catalog",
+  "description": "Custom A2UI catalog definition for the Common Origin Design System v2.4. Defines all permitted component types, their required/optional properties, and allowed values.",
+  "$defs": {
+    "stringOrPath": {
+      "description": "A literal string or a data-binding path.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "properties": { "path": { "type": "string" } },
+          "required": ["path"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "numberOrPath": {
+      "description": "A literal number or a data-binding path.",
+      "oneOf": [
+        { "type": "number" },
+        {
+          "type": "object",
+          "properties": { "path": { "type": "string" } },
+          "required": ["path"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "booleanOrPath": {
+      "description": "A literal boolean or a data-binding path.",
+      "oneOf": [
+        { "type": "boolean" },
+        {
+          "type": "object",
+          "properties": { "path": { "type": "string" } },
+          "required": ["path"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "childrenProperty": {
+      "description": "An array of child component IDs.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "actionObject": {
+      "description": "A user action dispatched to the host application.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "context": { "type": "object" },
+        "dataPath": {
+          "type": "string",
+          "description": "If provided, the updated value is written to this data model path."
+        }
+      },
+      "additionalProperties": true
+    },
+    "componentCommon": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique component ID within the surface. One component MUST have id 'root'."
+        }
+      },
+      "required": ["id"]
+    },
+
+    "anyComponent": {
+      "oneOf": [
+        { "$ref": "#/$defs/Text" },
+        { "$ref": "#/$defs/Alert" },
+        { "$ref": "#/$defs/EmptyState" },
+        { "$ref": "#/$defs/Stack" },
+        { "$ref": "#/$defs/Divider" },
+        { "$ref": "#/$defs/TextField" },
+        { "$ref": "#/$defs/SearchField" },
+        { "$ref": "#/$defs/NumberField" },
+        { "$ref": "#/$defs/Select" },
+        { "$ref": "#/$defs/Checkbox" },
+        { "$ref": "#/$defs/Button" },
+        { "$ref": "#/$defs/Chip" },
+        { "$ref": "#/$defs/FilterChip" },
+        { "$ref": "#/$defs/BooleanChip" },
+        { "$ref": "#/$defs/TabBar" },
+        { "$ref": "#/$defs/Card" },
+        { "$ref": "#/$defs/List" },
+        { "$ref": "#/$defs/ListItem" },
+        { "$ref": "#/$defs/DateGroup" },
+        { "$ref": "#/$defs/MoneyDisplay" },
+        { "$ref": "#/$defs/TransactionListItem" },
+        { "$ref": "#/$defs/AccountCard" },
+        { "$ref": "#/$defs/CategoryBadge" },
+        { "$ref": "#/$defs/StatusBadge" },
+        { "$ref": "#/$defs/Modal" },
+        { "$ref": "#/$defs/ActionSheet" },
+        { "$ref": "#/$defs/Progress" },
+        { "$ref": "#/$defs/Skeleton" }
+      ],
+      "discriminator": {
+        "propertyName": "component"
+      }
+    },
+
+    "Text": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "Text" },
+        "text": { "$ref": "#/$defs/stringOrPath", "description": "The text content to display." },
+        "variant": {
+          "type": "string",
+          "description": "Typography variant.",
+          "enum": ["h1", "h2", "h3", "h4", "body", "caption", "label", "overline"]
+        }
+      },
+      "required": ["id", "component", "text"],
+      "additionalProperties": false
+    },
+
+    "Alert": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "Alert" },
+        "content": { "$ref": "#/$defs/stringOrPath", "description": "Alert message body." },
+        "title": { "$ref": "#/$defs/stringOrPath", "description": "Optional alert title." },
+        "variant": {
+          "type": "string",
+          "enum": ["info", "success", "warning", "error"]
+        }
+      },
+      "required": ["id", "component", "content"],
+      "additionalProperties": false
+    },
+
+    "EmptyState": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "EmptyState" },
+        "title": { "$ref": "#/$defs/stringOrPath" },
+        "description": { "$ref": "#/$defs/stringOrPath" },
+        "illustration": { "type": "string", "description": "Illustration key e.g. 'search', 'empty', 'error'." },
+        "action": {
+          "type": "object",
+          "description": "Primary CTA button.",
+          "properties": {
+            "label": { "type": "string" },
+            "onClick": { "$ref": "#/$defs/actionObject" },
+            "variant": { "type": "string" },
+            "icon": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "secondaryAction": {
+          "type": "object",
+          "description": "Secondary CTA button.",
+          "properties": {
+            "label": { "type": "string" },
+            "onClick": { "$ref": "#/$defs/actionObject" },
+            "variant": { "type": "string" },
+            "icon": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "variant": {
+          "type": "string",
+          "enum": ["default", "compact", "card"]
+        },
+        "size": {
+          "type": "string",
+          "enum": ["small", "medium", "large"]
+        }
+      },
+      "required": ["id", "component", "title"],
+      "additionalProperties": false
+    },
+
+    "Stack": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "Stack" },
+        "direction": {
+          "type": "string",
+          "enum": ["row", "column"]
+        },
+        "gap": {
+          "type": "string",
+          "description": "Spacing gap.",
+          "enum": ["none", "xs", "sm", "md", "lg", "xl"]
+        },
+        "children": { "$ref": "#/$defs/childrenProperty" }
+      },
+      "required": ["id", "component", "children"],
+      "additionalProperties": false
+    },
+
+    "Divider": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "Divider" },
+        "orientation": {
+          "type": "string",
+          "enum": ["horizontal", "vertical"]
+        }
+      },
+      "required": ["id", "component"],
+      "additionalProperties": false
+    },
+
+    "TextField": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "TextField" },
+        "label": { "$ref": "#/$defs/stringOrPath" },
+        "value": { "$ref": "#/$defs/stringOrPath" },
+        "helperText": { "$ref": "#/$defs/stringOrPath" },
+        "error": { "$ref": "#/$defs/stringOrPath" },
+        "type": {
+          "type": "string",
+          "enum": ["text", "email", "password", "tel", "url"]
+        },
+        "required": { "type": "boolean" },
+        "disabled": { "type": "boolean" },
+        "onChange": { "$ref": "#/$defs/actionObject" }
+      },
+      "required": ["id", "component", "label"],
+      "additionalProperties": false
+    },
+
+    "SearchField": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "SearchField" },
+        "value": { "$ref": "#/$defs/stringOrPath" },
+        "placeholder": { "type": "string" },
+        "disabled": { "type": "boolean" },
+        "loading": { "type": "boolean" },
+        "debounceMs": { "type": "number" },
+        "suggestions": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "showRecentSearches": { "type": "boolean" },
+        "recentSearches": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "onChange": { "$ref": "#/$defs/actionObject" },
+        "onSuggestionSelect": { "$ref": "#/$defs/actionObject" },
+        "onClearRecentSearches": { "$ref": "#/$defs/actionObject" }
+      },
+      "required": ["id", "component"],
+      "additionalProperties": false
+    },
+
+    "NumberField": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "NumberField" },
+        "label": { "$ref": "#/$defs/stringOrPath" },
+        "value": { "$ref": "#/$defs/numberOrPath" },
+        "helperText": { "$ref": "#/$defs/stringOrPath" },
+        "error": { "$ref": "#/$defs/stringOrPath" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number" },
+        "required": { "type": "boolean" },
+        "disabled": { "type": "boolean" },
+        "onChange": { "$ref": "#/$defs/actionObject" }
+      },
+      "required": ["id", "component", "label"],
+      "additionalProperties": false
+    },
+
+    "Select": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "Select" },
+        "label": { "$ref": "#/$defs/stringOrPath" },
+        "value": { "$ref": "#/$defs/stringOrPath" },
+        "placeholder": { "type": "string" },
+        "disabled": { "type": "boolean" },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "value": { "type": "string" },
+              "label": { "type": "string" }
+            },
+            "required": ["value", "label"],
+            "additionalProperties": false
+          }
+        },
+        "onChange": { "$ref": "#/$defs/actionObject" }
+      },
+      "required": ["id", "component", "label", "options"],
+      "additionalProperties": false
+    },
+
+    "Checkbox": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "Checkbox" },
+        "label": { "$ref": "#/$defs/stringOrPath" },
+        "checked": { "$ref": "#/$defs/booleanOrPath" },
+        "disabled": { "type": "boolean" },
+        "onChange": { "$ref": "#/$defs/actionObject" }
+      },
+      "required": ["id", "component", "label"],
+      "additionalProperties": false
+    },
+
+    "Button": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "Button" },
+        "label": { "$ref": "#/$defs/stringOrPath", "description": "Button label text." },
+        "variant": {
+          "type": "string",
+          "enum": ["primary", "secondary", "ghost", "danger"]
+        },
+        "size": {
+          "type": "string",
+          "enum": ["small", "medium", "large"]
+        },
+        "disabled": { "type": "boolean" },
+        "action": { "$ref": "#/$defs/actionObject", "description": "Action dispatched on click." },
+        "onClick": { "$ref": "#/$defs/actionObject", "description": "Alias for action." }
+      },
+      "required": ["id", "component", "label"],
+      "additionalProperties": false
+    },
+
+    "Chip": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "Chip" },
+        "content": { "$ref": "#/$defs/stringOrPath" },
+        "variant": {
+          "type": "string",
+          "enum": ["default", "outline", "filled"]
+        },
+        "size": {
+          "type": "string",
+          "enum": ["small", "medium", "large"]
+        },
+        "onClick": { "$ref": "#/$defs/actionObject" }
+      },
+      "required": ["id", "component", "content"],
+      "additionalProperties": false
+    },
+
+    "FilterChip": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "FilterChip" },
+        "content": { "$ref": "#/$defs/stringOrPath" },
+        "selected": { "type": "boolean" },
+        "onDismiss": { "$ref": "#/$defs/actionObject" }
+      },
+      "required": ["id", "component", "content"],
+      "additionalProperties": false
+    },
+
+    "BooleanChip": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "BooleanChip" },
+        "content": { "$ref": "#/$defs/stringOrPath" },
+        "selected": { "type": "boolean" },
+        "onClick": { "$ref": "#/$defs/actionObject" }
+      },
+      "required": ["id", "component", "content"],
+      "additionalProperties": false
+    },
+
+    "TabBar": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "TabBar" },
+        "tabs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "badge": { "type": "number" }
+            },
+            "required": ["id", "label"],
+            "additionalProperties": false
+          }
+        },
+        "activeTab": { "$ref": "#/$defs/stringOrPath" },
+        "variant": {
+          "type": "string",
+          "enum": ["default", "pills", "underline"]
+        },
+        "onTabChange": { "$ref": "#/$defs/actionObject" }
+      },
+      "required": ["id", "component", "tabs"],
+      "additionalProperties": false
+    },
+
+    "Card": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "Card" },
+        "title": { "$ref": "#/$defs/stringOrPath" },
+        "subtitle": { "$ref": "#/$defs/stringOrPath" },
+        "excerpt": { "$ref": "#/$defs/stringOrPath" },
+        "labels": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "children": { "$ref": "#/$defs/childrenProperty" }
+      },
+      "required": ["id", "component", "title"],
+      "additionalProperties": false
+    },
+
+    "List": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "List" },
+        "dividers": { "type": "boolean" },
+        "spacing": {
+          "type": "string",
+          "enum": ["compact", "comfortable", "spacious"]
+        },
+        "children": { "$ref": "#/$defs/childrenProperty" }
+      },
+      "required": ["id", "component", "children"],
+      "additionalProperties": false
+    },
+
+    "ListItem": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "ListItem" },
+        "primary": { "$ref": "#/$defs/stringOrPath", "description": "Primary text line." },
+        "secondary": { "$ref": "#/$defs/stringOrPath", "description": "Secondary text line." },
+        "badge": { "type": "string", "description": "ID of a badge component to render." },
+        "interactive": { "type": "boolean" },
+        "onClick": { "$ref": "#/$defs/actionObject" },
+        "children": { "$ref": "#/$defs/childrenProperty" }
+      },
+      "required": ["id", "component", "primary"],
+      "additionalProperties": false
+    },
+
+    "DateGroup": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "DateGroup" },
+        "date": { "$ref": "#/$defs/stringOrPath", "description": "ISO date string or relative keyword." },
+        "format": {
+          "type": "string",
+          "enum": ["short", "medium", "long", "relative"]
+        },
+        "showTotal": { "type": "boolean" },
+        "totalAmount": { "$ref": "#/$defs/numberOrPath" },
+        "showCount": { "type": "boolean" },
+        "count": { "$ref": "#/$defs/numberOrPath" },
+        "sticky": { "type": "boolean" },
+        "currency": { "type": "string", "description": "ISO 4217 currency code." },
+        "children": { "$ref": "#/$defs/childrenProperty" }
+      },
+      "required": ["id", "component", "date", "children"],
+      "additionalProperties": false
+    },
+
+    "MoneyDisplay": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "MoneyDisplay" },
+        "amount": { "$ref": "#/$defs/numberOrPath" },
+        "currency": { "type": "string", "description": "ISO 4217 currency code. Defaults to AUD." },
+        "variant": {
+          "type": "string",
+          "enum": ["default", "positive", "negative", "muted"]
+        },
+        "showSign": { "type": "boolean" },
+        "size": {
+          "type": "string",
+          "enum": ["small", "medium", "large"]
+        },
+        "weight": {
+          "type": "string",
+          "enum": ["regular", "medium", "bold"]
+        },
+        "locale": { "type": "string", "description": "BCP 47 locale. Defaults to en-AU." },
+        "align": {
+          "type": "string",
+          "enum": ["left", "center", "right"]
+        }
+      },
+      "required": ["id", "component", "amount"],
+      "additionalProperties": false
+    },
+
+    "TransactionListItem": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "TransactionListItem" },
+        "merchant": { "$ref": "#/$defs/stringOrPath" },
+        "amount": { "$ref": "#/$defs/numberOrPath" },
+        "date": { "$ref": "#/$defs/stringOrPath", "description": "ISO date string." },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "pending", "failed", "cancelled", "processing", "refunded"]
+        },
+        "category": {
+          "type": "string",
+          "enum": ["shopping", "dining", "transport", "entertainment", "bills", "health", "education", "other"]
+        },
+        "merchantLogo": { "type": "string", "description": "URL to merchant logo image." },
+        "description": { "$ref": "#/$defs/stringOrPath" },
+        "hasReceipt": { "type": "boolean" },
+        "hasNote": { "type": "boolean" },
+        "currency": { "type": "string" },
+        "onClick": { "$ref": "#/$defs/actionObject" }
+      },
+      "required": ["id", "component", "merchant", "amount", "date"],
+      "additionalProperties": false
+    },
+
+    "AccountCard": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "AccountCard" },
+        "accountType": {
+          "type": "string",
+          "enum": ["everyday", "savings", "credit", "mortgage", "term-deposit"]
+        },
+        "accountName": { "$ref": "#/$defs/stringOrPath" },
+        "balance": { "$ref": "#/$defs/numberOrPath" },
+        "accountNumber": { "type": "string" },
+        "trend": {
+          "type": "string",
+          "enum": ["up", "down", "neutral"]
+        },
+        "trendValue": { "$ref": "#/$defs/stringOrPath" },
+        "action": {
+          "type": "object",
+          "properties": {
+            "label": { "type": "string" },
+            "onClick": { "$ref": "#/$defs/actionObject" },
+            "icon": { "type": "string" },
+            "variant": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "secondaryAction": {
+          "type": "object",
+          "properties": {
+            "label": { "type": "string" },
+            "onClick": { "$ref": "#/$defs/actionObject" },
+            "icon": { "type": "string" },
+            "variant": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "currency": { "type": "string" },
+        "onClick": { "$ref": "#/$defs/actionObject" }
+      },
+      "required": ["id", "component", "accountName", "balance"],
+      "additionalProperties": false
+    },
+
+    "CategoryBadge": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "CategoryBadge" },
+        "content": { "$ref": "#/$defs/stringOrPath", "description": "Badge text." },
+        "label": { "$ref": "#/$defs/stringOrPath", "description": "Alias for content." },
+        "color": {
+          "type": "string",
+          "enum": ["blue", "green", "red", "orange", "purple", "teal", "pink", "grey"]
+        },
+        "variant": {
+          "type": "string",
+          "enum": ["filled", "outline", "subtle"]
+        },
+        "size": {
+          "type": "string",
+          "enum": ["small", "medium", "large"]
+        },
+        "icon": { "type": "string" },
+        "onClick": { "$ref": "#/$defs/actionObject" },
+        "disabled": { "type": "boolean" }
+      },
+      "required": ["id", "component"],
+      "additionalProperties": false
+    },
+
+    "StatusBadge": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "StatusBadge" },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "pending", "failed", "cancelled", "processing", "refunded"]
+        },
+        "label": { "$ref": "#/$defs/stringOrPath" },
+        "size": {
+          "type": "string",
+          "enum": ["small", "medium", "large"]
+        },
+        "showIcon": { "type": "boolean" },
+        "liveRegion": { "type": "boolean" }
+      },
+      "required": ["id", "component", "status"],
+      "additionalProperties": false
+    },
+
+    "Modal": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "Modal" },
+        "title": { "$ref": "#/$defs/stringOrPath" },
+        "open": { "type": "boolean" },
+        "onClose": { "$ref": "#/$defs/actionObject" },
+        "children": { "$ref": "#/$defs/childrenProperty" }
+      },
+      "required": ["id", "component", "title"],
+      "additionalProperties": false
+    },
+
+    "ActionSheet": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "ActionSheet" },
+        "title": { "$ref": "#/$defs/stringOrPath" },
+        "description": { "$ref": "#/$defs/stringOrPath" },
+        "isOpen": { "type": "boolean" },
+        "onClose": { "$ref": "#/$defs/actionObject" },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "icon": { "type": "string" },
+              "destructive": { "type": "boolean" },
+              "disabled": { "type": "boolean" },
+              "onSelect": { "$ref": "#/$defs/actionObject" }
+            },
+            "required": ["id", "label"],
+            "additionalProperties": false
+          }
+        },
+        "closeOnOverlayClick": { "type": "boolean" },
+        "closeOnEscape": { "type": "boolean" },
+        "showCloseButton": { "type": "boolean" }
+      },
+      "required": ["id", "component", "actions"],
+      "additionalProperties": false
+    },
+
+    "Progress": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "Progress" },
+        "value": { "type": "number", "minimum": 0, "maximum": 100 },
+        "label": { "$ref": "#/$defs/stringOrPath" },
+        "variant": {
+          "type": "string",
+          "enum": ["linear", "circular"]
+        }
+      },
+      "required": ["id", "component", "value"],
+      "additionalProperties": false
+    },
+
+    "Skeleton": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/componentCommon" }],
+      "properties": {
+        "id": true,
+        "component": { "const": "Skeleton" },
+        "variant": {
+          "type": "string",
+          "enum": ["rect", "circle", "text"]
+        },
+        "width": { "type": "string" },
+        "height": { "type": "string" },
+        "count": { "type": "number", "minimum": 1 }
+      },
+      "required": ["id", "component"],
+      "additionalProperties": false
+    }
+  }
+}

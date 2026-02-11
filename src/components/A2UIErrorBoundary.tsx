@@ -9,6 +9,9 @@
 
 import React, { Component, ReactNode, ErrorInfo } from 'react';
 import styled from 'styled-components';
+import { createLogger } from '../lib/logger';
+
+const log = createLogger('ErrorBoundary');
 
 interface Props {
   children: ReactNode;
@@ -83,7 +86,7 @@ export class A2UIErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('[A2UI Error Boundary] Caught error:', error, errorInfo);
+    log.error('Caught rendering error', { error: error.message, componentStack: errorInfo.componentStack?.substring(0, 200) });
     this.setState({
       error,
       errorInfo,

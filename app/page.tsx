@@ -14,6 +14,8 @@ import { A2UISurface, useA2UISurface } from '@/src/components/A2UISurface';
 import { A2UIErrorBoundary } from '@/src/components/A2UIErrorBoundary';
 import { callAgent, getAgentMode, isRealAgentAvailable } from '@/src/lib/agentClient';
 import { analyzeQuery, getUnknownQueryResponse } from '@/src/server/queryRouter';
+import { CATALOG_ID } from '@/src/a2ui/catalog';
+import { createLogger } from '@/src/lib/logger';
 import styled from 'styled-components';
 import {
   Button,
@@ -28,7 +30,7 @@ import {
 // Custom wrapper for page-level styling and animation
 const PageWrapper = styled.div`
   min-height: 100vh;
-  background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+  background: linear-gradient(to bottom, var(--gradient-start), var(--gradient-end));
   animation: fadeIn 0.5s ease;
   
   @keyframes fadeIn {
@@ -48,8 +50,8 @@ const StatusIndicator = styled.div<{ $isGenerating: boolean }>`
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  background: ${props => props.$isGenerating ? '#fff3cd' : '#d1e7dd'};
-  color: ${props => props.$isGenerating ? '#856404' : '#0f5132'};
+  background: ${props => props.$isGenerating ? 'var(--status-generating-bg)' : 'var(--status-done-bg)'};
+  color: ${props => props.$isGenerating ? 'var(--status-generating-text)' : 'var(--status-done-text)'};
   font-size: 0.875rem;
   font-weight: 600;
   margin-bottom: 1rem;
@@ -72,7 +74,7 @@ const StatusIndicator = styled.div<{ $isGenerating: boolean }>`
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: ${props => props.$isGenerating ? '#ffc107' : '#198754'};
+    background: ${props => props.$isGenerating ? 'var(--status-generating-dot)' : 'var(--status-done-dot)'};
     animation: ${props => props.$isGenerating ? 'pulse 1.5s ease-in-out infinite' : 'none'};
   }
   
@@ -85,6 +87,8 @@ const StatusIndicator = styled.div<{ $isGenerating: boolean }>`
     }
   }
 `;
+
+const log = createLogger('Demo');
 
 export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -118,7 +122,7 @@ export default function Home() {
 
     // Analyze query and get scenario hint
     const analysis = analyzeQuery(queryToProcess);
-    console.log('[Query Router] Analysis:', analysis);
+    log.info('Query analysis', { query: queryToProcess, scenario: analysis.scenario, intent: analysis.intent });
 
     // Map scenario to agent hint
     let scenarioHint: string | undefined;
@@ -135,51 +139,44 @@ export default function Home() {
       await callAgent(
         queryToProcess,
         (message) => {
-          console.log('[Demo] Received message from agent:', Object.keys(message)[0]);
-          console.log('[Demo] Full message:', message);
+          log.debug('Received message', { type: Object.keys(message)[0] });
           sendMessage(message);
         },
         scenarioHint,
         {
           forceMode: agentMode,
           onError: (err) => {
-            console.error('[Demo] Agent error:', err);
+            log.error('Agent error', { message: err.message });
             setError(err.message);
           },
           retryOnError: true, // Fallback to mock if real agent fails
         }
       );
     } catch (error) {
-      console.error('[Demo] Error generating UI:', error);
+      log.error('Error generating UI', { error: error instanceof Error ? error.message : String(error) });
       setError(error instanceof Error ? error.message : 'Failed to generate UI');
       
-      // Show error message in UI
+      // Show error message in UI (v0.9 format)
       sendMessage({
-        surfaceUpdate: {
+        createSurface: {
           surfaceId: 'main',
-          components: [
-            {
-              id: 'error-alert',
-              component: {
-                Alert: {
-                  content: { 
-                    literalString: error instanceof Error 
-                      ? error.message 
-                      : 'Failed to generate UI. Please try again.' 
-                  },
-                  variant: 'error',
-                  title: { literalString: 'Error' },
-                },
-              },
-            },
-          ],
+          catalogId: CATALOG_ID,
         },
       });
       sendMessage({
-        beginRendering: {
+        updateComponents: {
           surfaceId: 'main',
-          root: 'error-alert',
-          catalogId: 'common-origin.design-system:v2.3',
+          components: [
+            {
+              id: 'root',
+              component: 'Alert',
+              content: error instanceof Error
+                ? error.message
+                : 'Failed to generate UI. Please try again.',
+              variant: 'error',
+              title: 'Error',
+            },
+          ],
         },
       });
     }
@@ -188,7 +185,7 @@ export default function Home() {
     setHasGenerated(true);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !isGenerating) {
       handleSubmit();
     }
@@ -209,7 +206,7 @@ export default function Home() {
               A2UI + Common Origin Demo
             </Typography>
           </div>
-          <div style={{ color: '#6c757d', fontSize: '1.125rem' }}>
+          <div style={{ color: 'var(--muted)', fontSize: '1.125rem' }}>
             <Typography variant="body">
               Agent-generated UI rendered through a trusted component catalog
             </Typography>
@@ -219,7 +216,7 @@ export default function Home() {
         {/* Agent Mode Toggle */}
         {realAgentAvailable && (
           <Box style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center', gap: '1rem', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.875rem', color: '#6c757d', fontWeight: 500 }}>
+            <span style={{ fontSize: '0.875rem', color: 'var(--muted)', fontWeight: 500 }}>
               Agent Mode:
             </span>
             <Stack direction="row" gap="xs">
@@ -275,8 +272,8 @@ export default function Home() {
             wrap={true}
           >
             <Chip
-              onClick={!isGenerating ? () => handleExampleClick('Find my Starbucks transactions') : undefined}
-              aria-label="Find my Starbucks transactions"
+              onClick={!isGenerating ? () => handleExampleClick('Find my Woolworths transactions') : undefined}
+              aria-label="Find my Woolworths transactions"
               disabled={isGenerating}
             >
               Find transactions
@@ -311,7 +308,7 @@ export default function Home() {
                 placeholder="Ask me about transactions, spending, or transfers..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyDown}
                 disabled={isGenerating}
                 label="Banking query"
                 aria-describedby="query-help"
@@ -334,10 +331,11 @@ export default function Home() {
           style={{
             maxWidth: '800px',
             margin: '0 auto',
-            background: 'white',
+            background: 'var(--surface)',
             borderRadius: '1rem',
             padding: '2rem',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            boxShadow: '0 4px 6px var(--shadow)',
+            border: '1px solid var(--border)',
             minHeight: '400px',
             transition: 'box-shadow 0.3s ease',
           }}

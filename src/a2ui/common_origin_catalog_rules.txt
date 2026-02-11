@@ -1,0 +1,33 @@
+**REQUIRED PROPERTIES:** You MUST include ALL required properties for every component, even if they are inside a template or will be bound to data.
+
+- For 'Text', you MUST provide 'text'. Use a plain string or { "path": "/..." } for data binding.
+- For 'Alert', you MUST provide 'content'. The 'variant' should be one of: info, success, warning, error.
+- For 'EmptyState', you MUST provide 'title'.
+- For 'Stack', you MUST provide 'children' as an array of component IDs. The 'direction' should be 'row' or 'column'. The 'gap' should be one of: none, xs, sm, md, lg, xl.
+- For 'TextField', you MUST provide 'label'.
+- For 'NumberField', you MUST provide 'label'.
+- For 'Select', you MUST provide 'label' and 'options'. Each option needs 'value' and 'label'.
+- For 'Checkbox', you MUST provide 'label'.
+- For 'Button', you MUST provide 'label'. Either 'action' or 'onClick' dispatches the click action.
+- For 'Chip', 'FilterChip', 'BooleanChip', you MUST provide 'content'.
+- For 'Card', you MUST provide 'title'.
+- For 'List', you MUST provide 'children'.
+- For 'ListItem', you MUST provide 'primary' (the primary text).
+- For 'DateGroup', you MUST provide 'date' and 'children'.
+- For 'MoneyDisplay', you MUST provide 'amount' (a number). Defaults: currency=AUD, locale=en-AU.
+- For 'TransactionListItem', you MUST provide 'merchant', 'amount', and 'date'. The 'status' should be one of: completed, pending, failed, cancelled, processing, refunded. The 'category' should be one of: shopping, dining, transport, entertainment, bills, health, education, other.
+- For 'AccountCard', you MUST provide 'accountName' and 'balance'. The 'accountType' should be one of: everyday, savings, credit, mortgage, term-deposit.
+- For 'StatusBadge', you MUST provide 'status' (same values as TransactionListItem).
+- For 'TabBar', you MUST provide 'tabs' (array of {id, label}).
+- For 'ActionSheet', you MUST provide 'actions' (array of {id, label}).
+- For 'Progress', you MUST provide 'value' (0-100).
+- For 'Modal', you MUST provide 'title'.
+- For 'Skeleton', no extra required props; 'variant' can be rect, circle, or text.
+
+**CHILDREN:** Children are always referenced by ID, never defined inline. Use a 'Stack' component to group multiple children when a component expects a single child.
+
+**DATA BINDING:** Use plain strings/numbers for static values. Use { "path": "/some/key" } to bind to the data model. Paths follow JSON Pointer (RFC 6901) syntax.
+
+**CURRENCY:** All monetary amounts default to AUD. Always use negative numbers for debits/expenses and positive for credits/income.
+
+**ACTIONS:** Action objects have { "name": "actionName", "context": { ... } }. Use 'dataPath' to specify which data model key to update with the new value.

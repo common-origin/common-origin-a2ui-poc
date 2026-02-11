@@ -1,410 +1,268 @@
 # A2UI + Common Origin Design System POC
 
-A demonstration of agent-generated UI using [A2UI](https://a2ui.org) (Agent to UI) principles, rendered through a trusted component catalog mapped to the [Common Origin Design System](https://github.com/common-origin/common-origin-design-system).
+A demonstration of agent-generated UI using [A2UI v0.9](https://a2ui.org) (Agent to UI), rendered through a trusted component catalog mapped to the [Common Origin Design System](https://github.com/common-origin/common-origin-design-system).
 
 ## Overview
 
-This project implements a secure, declarative approach to agent-generated interfaces where:
-- **Agents send data, not code**: UI is described in declarative JSON (A2UI messages), preventing code injection
-- **Catalog-based rendering**: Only pre-approved components from a trusted catalog can be rendered
-- **Framework mapping**: A2UI components map to Common Origin React components
-- **Incremental updates**: UI streams progressively as the agent generates it
+This project implements a secure, declarative approach to agent-generated interfaces:
 
-### Demo: Transaction Finder
+- **Agents send data, not code** — UI is described in declarative JSON (A2UI messages), preventing code injection
+- **Catalog-based rendering** — Only pre-approved components from a 28-component catalog can be rendered
+- **Prompt-Generate-Validate** — LLM output is validated against a formal JSON Schema before rendering
+- **Framework mapping** — A2UI component names map 1:1 to Common Origin React components
+- **Incremental streaming** — UI updates progressively as the agent generates messages
 
-The demo showcases a "Transaction Finder" UI that includes:
-- Search input field
-- Filter chips (Last 30 days, Money out, Card)
-- Transaction results list
-- Empty state handling
+### Banking Demo
+
+The demo showcases three banking scenarios, driven by natural language queries:
+
+| Scenario | Example Query | Components Used |
+|----------|--------------|-----------------|
+| Transaction Search | "Find my Woolworths transactions" | TransactionListItem, DateGroup, SearchField, FilterChip |
+| Spending Summary | "Show spending summary" | Card, CategoryBadge, MoneyDisplay, Progress |
+| Fund Transfer | "Transfer $100 to savings" | AccountCard, NumberField, Select, Button, Modal |
 
 ## Architecture
 
 ```
 ┌─────────────────┐
-│   Mock Agent    │  Generates A2UI JSONL messages
+│  Agent (Mock     │  Generates A2UI v0.9 JSONL messages
+│  or Gemini)     │
 └────────┬────────┘
          │ A2UI Messages (JSON)
          ▼
 ┌─────────────────┐
-│  A2UI Surface   │  Parses messages, maintains state
+│  Message        │  Validates structure, DoS limits, catalog schema
+│  Validator      │
 └────────┬────────┘
-         │ Component references
+         │ Validated messages
          ▼
 ┌─────────────────┐
-│ Catalog Layer   │  Security boundary - whitelisted components
+│  A2UI Surface   │  Maintains component tree + data model state
 └────────┬────────┘
-         │ Maps to
+         │ Component nodes
          ▼
 ┌─────────────────┐
-│ Common Origin   │  Actual React components rendered
+│ Catalog Layer   │  Security boundary — 28 whitelisted components
+│                 │  URL sanitisation, depth limits, prop mapping
+└────────┬────────┘
+         │ React elements
+         ▼
+┌─────────────────┐
+│ Common Origin   │  Actual React components rendered to DOM
 │ Design System   │
 └─────────────────┘
 ```
 
-### Key Files
+### Security Layers
 
-- **`src/a2ui/types.ts`**: A2UI message type definitions (surfaceUpdate, dataModelUpdate, beginRendering)
-- **`src/a2ui/catalog.ts`**: Component catalog and mapping layer (security boundary)
-- **`src/components/A2UISurface.tsx`**: A2UI renderer surface with state management
-- **`src/server/mockAgent.ts`**: Mock agent simulating incremental UI generation
-- **`app/page.tsx`**: Demo page with UI generation triggers
-- **`vendor/a2ui/`**: Reference A2UI repository (not directly imported)
+1. **Message validation** — Structure checks, DoS limits (100 components, 50 children, 50KB data model, depth 10)
+2. **Catalog validation** — Components validated against JSON Schema (required props, enum values, unknown props)
+3. **URL sanitisation** — Blocks `javascript:`, `data:text/html`, and other injection vectors
+4. **Whitelist rendering** — Only components in `VALID_COMPONENT_TYPES` are rendered; unknown types are silently dropped
 
-## Setup
+## A2UI v0.9 Message Format
 
-### Requirements
-
-- Node.js 18+
-- pnpm (or npm)
-
-### Installation
-
-```bash
-# Clone and navigate to project
-cd ~/common-origin-a2ui-poc
-
-# Install dependencies
-pnpm install
-
-# Set up environment variables (optional for Phase 5)
-cp .env.local.example .env.local
-# Edit .env.local and add your GEMINI_API_KEY if using real agent
-
-# Run development server
-pnpm dev
+### 1. Create Surface
+```json
+{"createSurface":{"surfaceId":"main","catalogId":"common-origin.design-system:v2.4"}}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the demo.
-
-### Environment Variables
-
-For real agent integration (Phase 5), create a `.env.local` file:
-
-```bash
-NEXT_PUBLIC_GEMINI_API_KEY=your_api_key_here
-NEXT_PUBLIC_AGENT_MODE=mock  # or 'real' for live agent
+### 2. Update Components
+```json
+{"updateComponents":{"surfaceId":"main","components":[
+  {"id":"root","component":"Stack","direction":"column","gap":"lg","children":["h1","list"]},
+  {"id":"h1","component":"Text","text":"Recent Transactions","variant":"h2"},
+  {"id":"list","component":"List","children":["tx1"]}
+]}}
 ```
 
-See `.env.local.example` for the template.
-
-### Build for Production
-
-```bash
-pnpm build
-pnpm start
+### 3. Update Data Model
+```json
+{"updateDataModel":{"surfaceId":"main","value":{"query":"Woolworths","totalAmount":-87.43}}}
 ```
 
-## How the Catalog Works
-
-### Security Rationale
-
-The catalog is the **critical security boundary** in agent-generated UI:
-
-1. **No arbitrary code execution**: Agents can only reference components by name, not send executable code
-2. **Strict prop schemas**: Each component has a defined interface with typed, validated props
-3. **Client-controlled rendering**: The client owns all rendering logic and styling decisions
-4. **Whitelist approach**: Only explicitly defined components can be used
-
-### Example: Button Component
-
-```typescript
-// Agent sends this A2UI message:
-{
-  "surfaceUpdate": {
-    "surfaceId": "main",
-    "components": [{
-      "id": "submit-btn",
-      "component": {
-        "Button": {
-          "label": {"literalString": "Submit"},
-          "variant": "primary",
-          "size": "medium"
-        }
-      }
-    }]
-  }
-}
-
-// Catalog maps it to Common Origin Button:
-import { Button } from '@common-origin/design-system';
-
-return (
-  <Button variant="primary" size="medium">
-    Submit
-  </Button>
-);
+### 4. Delete Surface
+```json
+{"deleteSurface":{"surfaceId":"main"}}
 ```
 
-### Catalog Components
+## Catalog Components (28)
 
-Current catalog includes:
-
-| A2UI Component | Common Origin Component | Props |
-|---------------|------------------------|-------|
-| `Text` | `Typography` | text, variant (h1/h2/h3/body/caption) |
-| `Button` | `Button` | label, variant, size, action, disabled |
-| `TextField` | `TextField` | label, value, helperText, error, type, required |
-| `Chip` | `Chip` | content, variant, size, onClick |
-| `FilterChip` | `FilterChip` | content, selected, onDismiss |
-| `BooleanChip` | `BooleanChip` | content, selected, onClick |
-| `Card` | `CardLarge` | title, excerpt, subtitle, labels, onClick |
-| `List` | `List` | dividers, spacing |
-| `ListItem` | `ListItem` | primary, secondary, badge, interactive, onClick |
-| `Stack` | `Stack` | direction, gap, align |
-| `Alert` | `Alert` | content, variant, title |
-| `Divider` | `Divider` | orientation |
-
-## Adding a New Catalog Component
-
-To add a new component to the catalog:
-
-### 1. Define the Component Interface
-
-In `src/a2ui/types.ts`, add the component type:
-
-```typescript
-export interface MyNewComponent {
-  title: DataBinding | { literalString: string };
-  description?: DataBinding | { literalString: string };
-  variant?: 'default' | 'special';
-}
-
-// Add to CatalogComponent union type:
-export type CatalogComponent =
-  | { Text: TextComponent }
-  | { MyNew: MyNewComponent }  // Add this
-  | ...
-```
-
-### 2. Add Rendering Logic
-
-In `src/a2ui/catalog.ts`, add the rendering case:
-
-```typescript
-import { MyNewComponentFromCommonOrigin } from '@common-origin/design-system';
-
-export function renderNode(node: ComponentNode, surface: SurfaceState, onAction?: (action: any) => void): React.ReactElement | null {
-  const { component } = node;
-  
-  // ... existing components ...
-  
-  if ('MyNew' in component) {
-    const { title, description, variant = 'default' } = component.MyNew;
-    const titleText = resolveDataBinding(title, surface.dataModel);
-    const descText = description ? resolveDataBinding(description, surface.dataModel) : undefined;
-    
-    return React.createElement(MyNewComponentFromCommonOrigin, {
-      key: node.id,
-      title: titleText,
-      description: descText,
-      variant,
-    });
-  }
-  
-  return null;
-}
-```
-
-### 3. Update Validation
-
-Add the component name to `isValidComponent()`:
-
-```typescript
-export function isValidComponent(component: CatalogComponent): boolean {
-  const validTypes = [
-    'Text',
-    'MyNew',  // Add this
-    // ...
-  ];
-  
-  return validTypes.some((type) => type in component);
-}
-```
-
-### 4. Update Agent
-
-Modify `src/server/mockAgent.ts` to use the new component:
-
-```typescript
-{
-  id: 'my-element',
-  component: {
-    MyNew: {
-      title: { literalString: 'Hello' },
-      variant: 'special'
-    }
-  }
-}
-```
-
-## Swapping Mock Agent for Real AI
-
-To integrate a real AI agent (e.g., Gemini via Google AI SDK):
-
-### High-Level Steps
-
-1. **Install AI SDK**:
-   ```bash
-   pnpm add @google/generative-ai
-   ```
-
-2. **Create Real Agent Module** (`src/server/realAgent.ts`):
-   ```typescript
-   import { GoogleGenerativeAI } from '@google/generative-ai';
-   
-   export async function streamUIFromGemini(
-     prompt: string,
-     onMessage: (message: A2UIMessage) => void
-   ) {
-     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-     
-     // System instruction: "You are a UI generator. Output A2UI JSONL messages..."
-     const stream = await model.generateContentStream({
-       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-       generationConfig: {
-         // Configure for JSONL output
-       }
-     });
-     
-     for await (const chunk of stream.stream) {
-       const text = chunk.text();
-       // Parse JSONL lines and call onMessage() for each
-       text.split('\n').forEach(line => {
-         if (line.trim()) {
-           const message = JSON.parse(line);
-           onMessage(message);
-         }
-       });
-     }
-   }
-   ```
-
-3. **Update Page Component**:
-   ```typescript
-   import { streamUIFromGemini } from '@/src/server/realAgent';
-   
-   const handleGenerate = async () => {
-     await streamUIFromGemini(
-       'Generate a transaction finder UI with search, filters, and results list',
-       (message) => sendMessage(message)
-     );
-   };
-   ```
-
-4. **Agent Prompt Engineering**:
-   - Provide catalog documentation in system prompt
-   - Include examples of valid A2UI messages
-   - Specify JSONL output format requirements
-   - Include component prop schemas
-
-### A2A/AG-UI Integration
-
-For production, consider using standardized agent protocols:
-
-- **[AG-UI (Agent-UI Protocol)](https://developers.googleblog.com/)**: Google's protocol for agent-generated interfaces
-- **A2A (Agent-to-Agent)**: For multi-agent coordination with shared UI
-
-These provide:
-- Standardized message formats
-- Built-in streaming
-- Error handling
-- State synchronization
-- Multi-turn conversations
+| Category | Component | Description |
+|----------|-----------|-------------|
+| **Typography** | `Text` | Typography with 8 variants (h1–h4, body, caption, label, overline) |
+| **Feedback** | `Alert` | Alert banner with info/success/warning/error variants |
+| | `EmptyState` | Empty state with illustration, title, description, CTA |
+| **Layout** | `Stack` | Flex container with direction, gap, alignment |
+| | `Divider` | Visual separator (horizontal/vertical) |
+| **Input** | `TextField` | Text input with label, validation, helper text |
+| | `SearchField` | Search input with autocomplete and debouncing |
+| | `NumberField` | Numeric input with min/max constraints |
+| | `Select` | Dropdown with typed options |
+| | `Checkbox` | Boolean toggle input |
+| **Action** | `Button` | 4 variants (primary/secondary/ghost/destructive) × 3 sizes |
+| | `Chip` | Display chip with variant/size options |
+| | `FilterChip` | Dismissible filter chip |
+| | `BooleanChip` | Toggle chip for boolean filters |
+| **Navigation** | `TabBar` | Tab navigation with 3 visual styles and badge counts |
+| **Container** | `Card` | Content card with title, excerpt, labels |
+| | `List` | List container with divider/spacing options |
+| | `ListItem` | List item with primary/secondary text, badge, icon |
+| | `DateGroup` | Date-grouped container with header and total |
+| **Banking** | `MoneyDisplay` | Formatted currency display with positive/negative colouring |
+| | `TransactionListItem` | Rich transaction item (merchant, amount, status, category) |
+| | `AccountCard` | Account summary with balance, trend, actions |
+| | `CategoryBadge` | Category indicator with 8 colour options |
+| | `StatusBadge` | Transaction status badge (pending/completed/failed/etc.) |
+| **Overlay** | `Modal` | Confirmation dialog |
+| | `ActionSheet` | Mobile-optimised bottom sheet menu |
+| **Feedback** | `Progress` | Progress indicator with percentage |
+| | `Skeleton` | Loading placeholder with multiple variants |
 
 ## Project Structure
 
 ```
 common-origin-a2ui-poc/
 ├── app/
-│   ├── layout.tsx          # Root layout with styled-components registry
-│   ├── page.tsx            # Demo page
-│   └── globals.css         # Global styles
+│   ├── layout.tsx                 # Root layout (SurfaceProvider + SC registry)
+│   ├── page.tsx                   # Demo page with chat interface
+│   ├── globals.css                # CSS variables (light + dark mode)
+│   └── api/agent/route.ts         # Streaming API endpoint for agents
 ├── src/
 │   ├── a2ui/
-│   │   ├── types.ts        # A2UI message type definitions
-│   │   └── catalog.ts      # Component catalog and mapping
+│   │   ├── types.ts               # A2UI message type definitions (v0.9)
+│   │   ├── catalog.ts             # Component catalog + security boundary
+│   │   ├── constants.ts           # Server-safe constants (CATALOG_ID)
+│   │   ├── skeleton.tsx           # Skeleton loading state components
+│   │   ├── common_origin_catalog_definition.json  # JSON Schema for catalog
+│   │   └── common_origin_catalog_rules.txt        # LLM prompt rules
 │   ├── components/
-│   │   └── A2UISurface.tsx # A2UI renderer surface
-│   ├── server/
-│   │   └── mockAgent.ts    # Mock agent for demo
-│   └── lib/
-│       └── registry.tsx    # Styled-components setup
-├── vendor/
-│   └── a2ui/              # Reference A2UI repo (not imported)
+│   │   ├── A2UISurface.tsx        # A2UI renderer with state management
+│   │   ├── A2UIErrorBoundary.tsx  # Error boundary for safe rendering
+│   │   └── SurfaceContext.tsx     # React context for surface state
+│   ├── lib/
+│   │   ├── agentClient.ts         # Client-side agent interface (mock/real)
+│   │   ├── messageValidator.ts    # A2UI message validation + DoS limits
+│   │   ├── catalogValidator.ts    # Deep component prop validation
+│   │   ├── logger.ts              # Structured logging
+│   │   └── registry.tsx           # Styled-components SSR registry
+│   └── server/
+│       ├── mockAgent.ts           # Mock agent with AU banking data
+│       ├── queryRouter.ts         # NL query → scenario routing
+│       ├── spendingSummaryAgent.ts # Gemini spending summary agent
+│       ├── fundTransferAgent.ts   # Gemini fund transfer agent
+│       └── systemPrompt.ts        # Shared Gemini system prompt
+├── vendor/a2ui/                   # Reference A2UI specification
+├── vitest.config.ts               # Test configuration
 ├── package.json
-├── tsconfig.json
-└── README.md
+└── tsconfig.json
 ```
 
-## A2UI Message Flow
+## Setup
 
-### 1. Surface Update
-Define components:
+### Requirements
+
+- Node.js 18+
+- pnpm
+
+### Installation
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Environment Variables
+
+For real Gemini agent integration, create `.env.local`:
+
+```bash
+NEXT_PUBLIC_GEMINI_API_KEY=your_api_key_here
+NEXT_PUBLIC_AGENT_MODE=mock   # or 'real'
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start development server |
+| `pnpm build` | Production build |
+| `pnpm start` | Start production server |
+| `pnpm test` | Run test suite (Vitest) |
+| `pnpm test:watch` | Run tests in watch mode |
+| `pnpm lint` | Run ESLint |
+
+## Adding a New Catalog Component
+
+### 1. Define in JSON Schema
+
+Add the component definition to `src/a2ui/common_origin_catalog_definition.json`:
+
 ```json
 {
-  "surfaceUpdate": {
-    "surfaceId": "main",
-    "components": [
-      {
-        "id": "search",
-        "component": {
-          "TextField": {
-            "label": {"literalString": "Search"}
-          }
-        }
-      }
-    ]
+  "MyWidget": {
+    "type": "object",
+    "required": ["id", "component", "title"],
+    "properties": {
+      "id": { "type": "string" },
+      "component": { "const": "MyWidget" },
+      "title": { "$ref": "#/$defs/stringOrPath" },
+      "variant": { "enum": ["default", "compact"] }
+    },
+    "additionalProperties": false
   }
 }
 ```
 
-### 2. Data Model Update
-Populate data:
-```json
-{
-  "dataModelUpdate": {
-    "surfaceId": "main",
-    "contents": [
-      {
-        "key": "query",
-        "valueString": "groceries"
-      }
-    ]
-  }
+### 2. Add Rendering Logic
+
+In `src/a2ui/catalog.ts`, add a case to the `renderNode` switch:
+
+```typescript
+case 'MyWidget': {
+  const title = resolveBinding(node.title as StringOrPath, dm);
+  return React.createElement(MyWidgetComponent, {
+    key: id,
+    title,
+    variant: node.variant || 'default',
+  });
 }
 ```
 
-### 3. Begin Rendering
-Trigger render:
-```json
-{
-  "beginRendering": {
-    "surfaceId": "main",
-    "root": "search",
-    "catalogId": "common-origin.design-system:v2.0"
-  }
-}
+### 3. Add to Valid Types
+
+In `src/a2ui/catalog.ts`, add `'MyWidget'` to `VALID_COMPONENT_TYPES`.
+
+### 4. Add to LLM Rules
+
+Update `src/a2ui/common_origin_catalog_rules.txt` with usage instructions for the LLM.
+
+### 5. Write Tests
+
+Add tests in `src/a2ui/catalog.test.ts` and `src/lib/catalogValidator.test.ts`.
+
+## Testing
+
+The project uses Vitest with 62 tests across 4 test files:
+
+- **`src/lib/messageValidator.test.ts`** — Message structure, DoS limits, catalog warnings
+- **`src/lib/catalogValidator.test.ts`** — Component prop validation, enum checks
+- **`src/server/queryRouter.test.ts`** — Query routing, entity extraction
+- **`src/a2ui/catalog.test.ts`** — URL sanitisation, component whitelist, metadata
+
+```bash
+pnpm test
 ```
-
-## Next Steps
-
-- [ ] Add more catalog components (Modal, Tabs, Navigation)
-- [ ] Implement data binding with live updates
-- [ ] Add action handlers for interactive components
-- [ ] Integrate real AI agent (Gemini)
-- [ ] Add A2A protocol support for multi-agent scenarios
-- [ ] Implement error boundaries and validation
-- [ ] Add accessibility testing
-- [ ] Create component playground
 
 ## Resources
 
-- [A2UI Quickstart](https://a2ui.org/quickstart/)
+- [A2UI Specification v0.9](vendor/a2ui/specification/0.9/)
 - [A2UI Blog Post](https://developers.googleblog.com/introducing-a2ui-an-open-project-for-agent-driven-interfaces/)
 - [Common Origin Design System](https://github.com/common-origin/common-origin-design-system)
-- [Google A2UI Repo](https://github.com/google/a2ui)
+- [Google A2UI Repository](https://github.com/google/a2ui)
 
 ## License
 

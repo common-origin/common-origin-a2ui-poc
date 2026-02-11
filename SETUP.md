@@ -1,131 +1,105 @@
-# A2UI + Common Origin Setup Guide
+# Setup Guide
 
-## Commands to Run
+## Prerequisites
 
-### 1. Navigate to project directory
+- **Node.js** 18+ (recommended: 20+)
+- **pnpm** — install with `npm install -g pnpm` if needed
+
+## Quick Start
+
 ```bash
-cd ~/common-origin-a2ui-poc
-```
-
-### 2. Install dependencies (if not already done)
-```bash
+# Install dependencies
 pnpm install
-```
 
-### 3. Start development server
-```bash
+# Start development server
 pnpm dev
 ```
 
-### 4. Open in browser
-Navigate to: http://localhost:3000
+Open [http://localhost:3000](http://localhost:3000).
 
-### 5. Build for production
+## Environment Variables
+
+Copy the example file and configure:
+
 ```bash
-pnpm build
-pnpm start
+cp .env.local.example .env.local
+```
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_GEMINI_API_KEY` | Google Gemini API key (for real agent mode) | — |
+| `NEXT_PUBLIC_AGENT_MODE` | `mock` or `real` | `mock` |
+
+To get a Gemini API key, visit [Google AI Studio](https://aistudio.google.com/app/apikey).
+
+## Available Commands
+
+```bash
+pnpm dev          # Start dev server (http://localhost:3000)
+pnpm build        # Production build
+pnpm start        # Start production server
+pnpm test         # Run test suite
+pnpm test:watch   # Run tests in watch mode
+pnpm lint         # Run ESLint
 ```
 
 ## Project Structure
 
 ```
-common-origin-a2ui-poc/
-├── app/
-│   ├── favicon.ico
-│   ├── globals.css
-│   ├── layout.tsx          # Root layout with styled-components registry
-│   └── page.tsx            # Demo page with Generate UI button
-├── src/
-│   ├── a2ui/
-│   │   ├── catalog.ts      # Component catalog and mapping layer (SECURITY BOUNDARY)
-│   │   └── types.ts        # A2UI message type definitions
-│   ├── components/
-│   │   └── A2UISurface.tsx # A2UI renderer surface with state management
-│   ├── lib/
-│   │   └── registry.tsx    # Styled-components Next.js integration
-│   └── server/
-│       └── mockAgent.ts    # Mock agent with JSONL streaming
-├── vendor/
-│   └── a2ui/              # Reference A2UI repository (not directly imported)
-├── .gitignore
-├── eslint.config.mjs
-├── next.config.ts
-├── package.json
-├── pnpm-lock.yaml
-├── postcss.config.mjs
-├── README.md              # Comprehensive documentation
-├── SETUP.md              # This file
-├── tailwind.config.ts
-└── tsconfig.json
+app/
+├── layout.tsx            # Root layout — wraps in SurfaceProvider + StyledComponents
+├── page.tsx              # Main demo page with chat interface
+├── globals.css           # CSS custom properties (light + dark mode)
+└── api/agent/route.ts    # POST endpoint — streams A2UI JSONL from Gemini
 
+src/
+├── a2ui/
+│   ├── types.ts          # A2UI v0.9 message type definitions
+│   ├── catalog.ts        # Component catalog — maps A2UI names to React components
+│   ├── constants.ts      # CATALOG_ID constant (safe for server imports)
+│   ├── skeleton.tsx      # Loading skeleton components
+│   ├── common_origin_catalog_definition.json  # JSON Schema 2020-12 for all 28 components
+│   └── common_origin_catalog_rules.txt        # Natural language rules for LLM prompts
+├── components/
+│   ├── A2UISurface.tsx        # Core renderer — maintains surface state, renders tree
+│   ├── A2UIErrorBoundary.tsx  # Error boundary for graceful rendering failures
+│   └── SurfaceContext.tsx     # React context for surface registration/dispatch
+├── lib/
+│   ├── agentClient.ts         # Client-side agent abstraction (mock/real, retry, fallback)
+│   ├── messageValidator.ts    # Structural validation + DoS limits
+│   ├── catalogValidator.ts    # Component prop validation against JSON Schema
+│   ├── logger.ts              # Lightweight structured logger
+│   └── registry.tsx           # Styled-components SSR integration for Next.js
+└── server/
+    ├── mockAgent.ts           # Mock agent — 10 AU banking transactions, 3 scenarios
+    ├── queryRouter.ts         # NL query → scenario classifier with entity extraction
+    ├── spendingSummaryAgent.ts # Gemini agent for spending summary scenario
+    ├── fundTransferAgent.ts   # Gemini agent for fund transfer scenario
+    ├── systemPrompt.ts        # Shared system prompt builder
+    └── prompts/               # Scenario-specific LLM prompt templates
+
+vendor/a2ui/                   # Vendored A2UI specification (reference only)
 ```
 
-## File Changes Made
+## Design System Dependency
 
-### Created Files:
-1. **src/a2ui/types.ts** - A2UI message type definitions (SurfaceUpdate, DataModelUpdate, BeginRendering, DeleteSurface)
-2. **src/a2ui/catalog.ts** - Component catalog mapping A2UI components to Common Origin
-3. **src/components/A2UISurface.tsx** - A2UI renderer surface component
-4. **src/server/mockAgent.ts** - Mock agent generating Transaction Finder UI
-5. **src/lib/registry.tsx** - Styled-components SSR registry for Next.js
-6. **README.md** - Complete documentation
-7. **SETUP.md** - This setup guide
+This project depends on `@common-origin/design-system` (^2.4.0). The design system provides the actual React components that the A2UI catalog maps to. Ensure you have access to the Common Origin npm registry.
 
-### Modified Files:
-1. **app/page.tsx** - Replaced default Next.js page with A2UI demo
-2. **app/layout.tsx** - Added styled-components registry wrapper
-3. **tsconfig.json** - Excluded vendor/ directory from compilation
-4. **.gitignore** - Added vendor/ to ignore list
+## Troubleshooting
 
-## Dependencies Added
+### Build fails with `createContext` error
+The `CATALOG_ID` constant must be imported from `src/a2ui/constants.ts` (not `catalog.ts`) in server-side code. This avoids pulling React client imports into server API routes.
 
-```json
-{
-  "dependencies": {
-    "@common-origin/design-system": "^2.0.1",
-    "styled-components": "^6.1.19"
+### Gemini agent returns malformed JSON
+The mock agent is used as an automatic fallback. Set `NEXT_PUBLIC_AGENT_MODE=mock` to use only the mock agent while debugging.
+
+### Tests fail with module resolution errors
+Ensure `vitest.config.ts` has path aliases matching `tsconfig.json`:
+```ts
+resolve: {
+  alias: {
+    '@': path.resolve(__dirname),
+    '@/src': path.resolve(__dirname, 'src'),
   },
-  "devDependencies": {
-    "@types/styled-components": "^5.1.36"
-  }
-}
+},
 ```
-
-## What to Test
-
-1. **Click "Generate UI" button** - Should stream a transaction finder UI with:
-   - Title "Transaction Finder"
-   - Search input field
-   - Three filter chips (Last 30 days, Money out, Card)
-   - List of 5 transactions with amounts
-   - Status indicator showing streaming progress
-
-2. **Click "Show Empty State" button** - Should show:
-   - Search form and filters
-   - Alert message "No transactions found"
-
-## Key Architecture Points
-
-- **Security**: Agent sends JSON, not code. Only catalog components can render.
-- **Incremental**: UI streams progressively (skeleton → form → results).
-- **Catalog**: `src/a2ui/catalog.ts` is the trust boundary mapping A2UI → Common Origin.
-- **State**: `A2UISurface` maintains component tree and data model.
-- **Messages**: JSONL format with `surfaceUpdate`, `dataModelUpdate`, `beginRendering`.
-
-## TypeScript Compilation
-
-Note: There may be minor TypeScript warnings related to React.createElement with children.
-These can be resolved by adjusting how children are passed to React.createElement.
-
-To check for errors:
-```bash
-pnpm tsc --noEmit
-```
-
-## Next Steps
-
-See README.md for:
-- Adding new catalog components
-- Swapping mock agent for real AI (Gemini)
-- A2A/AG-UI integration guidance
-- Component catalog expansion

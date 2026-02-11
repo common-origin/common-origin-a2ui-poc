@@ -1,27 +1,23 @@
 'use client';
 
 /**
- * A2UI Surface Component
+ * A2UI Surface Component — v0.9
  * 
- * This component implements an A2UI renderer "surface" that:
- * 1. Accepts A2UI JSONL messages (surfaceUpdate, dataModelUpdate, beginRendering)
- * 2. Maintains surface state (component tree, data model)
- * 3. Handles incremental updates as messages arrive
- * 4. Renders components through the catalog security layer
- * 
- * Security model:
- * - Only catalog-approved components can be rendered
- * - No arbitrary code execution
- * - All props validated through catalog
+ * Processes v0.9 messages: createSurface, updateComponents, updateDataModel, deleteSurface
+ * Also accepts legacy v0.8 message names for backward compatibility.
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { renderNode, CATALOG_ID } from '../a2ui/catalog';
+import { createLogger } from '../lib/logger';
+import { useSurfaceRegistration, useSurfaceDispatch } from './SurfaceContext';
 import type {
   A2UIMessage,
   SurfaceState,
   ComponentNode,
 } from '../a2ui/types';
+
+const log = createLogger('Surface');
 
 interface A2UISurfaceProps {
   surfaceId?: string;
@@ -34,6 +30,14 @@ export function A2UISurface({
   onAction,
   className,
 }: A2UISurfaceProps) {
+  // Use context-based registration if available
+  let contextRegistration: ReturnType<typeof useSurfaceRegistration> | null = null;
+  try {
+    contextRegistration = useSurfaceRegistration();
+  } catch {
+    // Not inside provider — will fall back to window global
+  }
+
   const [surface, setSurface] = useState<SurfaceState>({
     surfaceId,
     components: new Map(),
@@ -47,6 +51,7 @@ export function A2UISurface({
    */
   const handleAction = useCallback((action: any) => {
     console.log('[A2UISurface] Action received:', action);
+    log.debug('Action received', { eventType: action?.eventType, dataPath: action?.dataPath });
 
     // Update data model if action includes data updates
     if (action.updateDataModel) {
@@ -66,68 +71,99 @@ export function A2UISurface({
   }, [onAction]);
 
   /**
-   * Process an A2UI message and update surface state
+   * Process an A2UI message (v0.9 + v0.8 compat) and update surface state
    */
   const processMessage = useCallback((message: A2UIMessage) => {
     setSurface((prev) => {
       const next = { ...prev };
+      const msg = message as Record<string, any>;
 
-      if ('surfaceUpdate' in message) {
-        const { surfaceId: msgSurfaceId, components } = message.surfaceUpdate;
+      // ── v0.9: createSurface (sent FIRST to initialise the surface) ──
+      if ('createSurface' in msg) {
+        const { surfaceId: msgSurfaceId, catalogId } = msg.createSurface;
+        if (msgSurfaceId !== surfaceId) return prev;
+        next.catalogId = catalogId;
+        next.root = 'root'; // v0.9 convention: root component always has id "root"
+        next.rendering = true;
+        return next;
+      }
+
+      // ── v0.9: updateComponents ── (also accepts legacy "surfaceUpdate")
+      if ('updateComponents' in msg || 'surfaceUpdate' in msg) {
+        const body = msg.updateComponents || msg.surfaceUpdate;
+        const { surfaceId: msgSurfaceId, components } = body;
         if (msgSurfaceId !== surfaceId) return prev;
 
-        // Add or update components
         const newComponents = new Map(prev.components);
         for (const component of components) {
           newComponents.set(component.id, component);
         }
         next.components = newComponents;
+        return next;
       }
 
-      if ('dataModelUpdate' in message) {
-        const { surfaceId: msgSurfaceId, contents } = message.dataModelUpdate;
+      // ── v0.9: updateDataModel ── (also accepts legacy "dataModelUpdate")
+      if ('updateDataModel' in msg || 'dataModelUpdate' in msg) {
+        const body = msg.updateDataModel || msg.dataModelUpdate;
+        const { surfaceId: msgSurfaceId } = body;
         if (msgSurfaceId !== surfaceId) return prev;
 
-        // Update data model
         const newDataModel = new Map(prev.dataModel);
-        for (const entry of contents) {
-          if (entry.valueString !== undefined) {
-            newDataModel.set(entry.key, entry.valueString);
-          } else if (entry.valueInt !== undefined) {
-            newDataModel.set(entry.key, entry.valueInt);
-          } else if (entry.valueBool !== undefined) {
-            newDataModel.set(entry.key, entry.valueBool);
-          } else if (entry.valueMap !== undefined) {
-            const mapValue: Record<string, any> = {};
-            for (const mapEntry of entry.valueMap) {
-              if (mapEntry.valueString !== undefined) {
-                mapValue[mapEntry.key] = mapEntry.valueString;
-              } else if (mapEntry.valueInt !== undefined) {
-                mapValue[mapEntry.key] = mapEntry.valueInt;
-              } else if (mapEntry.valueBool !== undefined) {
-                mapValue[mapEntry.key] = mapEntry.valueBool;
-              }
+
+        // v0.9 format: { value: {...}, path?, op? }
+        if (body.value && typeof body.value === 'object') {
+          const op = body.op || 'replace';
+          if (op === 'replace' || op === 'add') {
+            for (const [key, val] of Object.entries(body.value as Record<string, unknown>)) {
+              newDataModel.set(key, val);
             }
-            newDataModel.set(entry.key, mapValue);
+          } else if (op === 'remove' && body.path) {
+            const key = body.path.split('/').filter(Boolean).pop();
+            if (key) newDataModel.delete(key);
           }
         }
+
+        // Legacy v0.8 format: { contents: [{key, valueString|valueInt|...}] }
+        if (Array.isArray(body.contents)) {
+          for (const entry of body.contents) {
+            if (entry.valueString !== undefined) {
+              newDataModel.set(entry.key, entry.valueString);
+            } else if (entry.valueInt !== undefined) {
+              newDataModel.set(entry.key, entry.valueInt);
+            } else if (entry.valueNumber !== undefined) {
+              newDataModel.set(entry.key, entry.valueNumber);
+            } else if (entry.valueBool !== undefined) {
+              newDataModel.set(entry.key, entry.valueBool);
+            } else if (entry.valueMap !== undefined) {
+              const mapValue: Record<string, unknown> = {};
+              for (const mapEntry of entry.valueMap) {
+                if (mapEntry.valueString !== undefined) mapValue[mapEntry.key] = mapEntry.valueString;
+                else if (mapEntry.valueInt !== undefined) mapValue[mapEntry.key] = mapEntry.valueInt;
+                else if (mapEntry.valueBool !== undefined) mapValue[mapEntry.key] = mapEntry.valueBool;
+              }
+              newDataModel.set(entry.key, mapValue);
+            }
+          }
+        }
+
         next.dataModel = newDataModel;
+        return next;
       }
 
-      if ('beginRendering' in message) {
-        const { surfaceId: msgSurfaceId, root, catalogId } = message.beginRendering;
+      // ── Legacy v0.8: beginRendering (now replaced by createSurface) ──
+      if ('beginRendering' in msg) {
+        const { surfaceId: msgSurfaceId, root, catalogId } = msg.beginRendering;
         if (msgSurfaceId !== surfaceId) return prev;
-
         next.root = root;
         next.catalogId = catalogId;
         next.rendering = true;
+        return next;
       }
 
-      if ('deleteSurface' in message) {
-        const { surfaceId: msgSurfaceId } = message.deleteSurface;
+      // ── deleteSurface (same in v0.8 and v0.9) ──
+      if ('deleteSurface' in msg) {
+        const { surfaceId: msgSurfaceId } = msg.deleteSurface;
         if (msgSurfaceId !== surfaceId) return prev;
-
-        // Reset surface
         return {
           surfaceId,
           components: new Map(),
@@ -148,22 +184,27 @@ export function A2UISurface({
   }, [processMessage]);
 
   /**
-   * Expose methods to parent via ref or global registration
+   * Register this surface via React context (preferred) or window global (fallback)
    */
   useEffect(() => {
-    // Register this surface globally so messages can be routed to it
+    const handler = { processMessage, processMessages };
+
+    // Context-based registration (preferred)
+    if (contextRegistration) {
+      contextRegistration.register(surfaceId, handler);
+      return () => contextRegistration!.unregister(surfaceId);
+    }
+
+    // Fallback: window global (for use without provider)
     if (typeof window !== 'undefined') {
       (window as any).__a2uiSurfaces = (window as any).__a2uiSurfaces || {};
-      (window as any).__a2uiSurfaces[surfaceId] = {
-        processMessage,
-        processMessages,
-      };
+      (window as any).__a2uiSurfaces[surfaceId] = handler;
 
       return () => {
         delete (window as any).__a2uiSurfaces[surfaceId];
       };
     }
-  }, [surfaceId, processMessage, processMessages]);
+  }, [surfaceId, processMessage, processMessages, contextRegistration]);
 
   /**
    * Render the surface
@@ -214,28 +255,9 @@ export function A2UISurface({
 }
 
 /**
- * Helper hook to interact with a surface from parent components
+ * Helper hook to interact with a surface from parent components.
+ * Now delegates to SurfaceContext when available, falls back to window global.
  */
 export function useA2UISurface(surfaceId: string = 'main') {
-  const sendMessage = useCallback((message: A2UIMessage) => {
-    if (typeof window !== 'undefined') {
-      const surfaces = (window as any).__a2uiSurfaces;
-      const surface = surfaces?.[surfaceId];
-      if (surface) {
-        surface.processMessage(message);
-      }
-    }
-  }, [surfaceId]);
-
-  const sendMessages = useCallback((messages: A2UIMessage[]) => {
-    if (typeof window !== 'undefined') {
-      const surfaces = (window as any).__a2uiSurfaces;
-      const surface = surfaces?.[surfaceId];
-      if (surface) {
-        surface.processMessages(messages);
-      }
-    }
-  }, [surfaceId]);
-
-  return { sendMessage, sendMessages };
+  return useSurfaceDispatch(surfaceId);
 }
