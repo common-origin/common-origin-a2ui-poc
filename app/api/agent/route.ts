@@ -7,6 +7,7 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSystemPrompt } from '@/src/server/systemPrompt';
+import { analyzeQuery } from '@/src/server/queryRouter';
 import type { ScenarioType } from '@/src/server/queryRouter';
 import { createLogger, truncate } from '@/src/lib/logger';
 import type { NextRequest } from 'next/server';
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
   try {
     // Parse request body
     const body = await request.json();
-    const { query, scenario } = body;
+    const { query, scenario, history } = body;
 
     // Validate required fields
     if (!query || typeof query !== 'string') {
@@ -62,7 +63,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the Gemini model with scenario-specific prompt
-    const detectedScenario = (scenario as ScenarioType) || 'unknown';
+    // Use client-provided scenario if valid, otherwise detect from query
+    const validScenarios: ScenarioType[] = ['transaction-search', 'spending-summary', 'fund-transfer', 'account-overview', 'bill-payment', 'card-management', 'unknown'];
+    const detectedScenario: ScenarioType = validScenarios.includes(scenario as ScenarioType)
+      ? (scenario as ScenarioType)
+      : analyzeQuery(query).scenario;
     const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
       systemInstruction: getSystemPrompt(detectedScenario),
@@ -70,11 +75,27 @@ export async function POST(request: NextRequest) {
 
     const userPrompt = query;
 
-    log.info('Calling Gemini', { query, scenario, model: MODEL_NAME });
+    log.info('Calling Gemini', { query, scenario, model: MODEL_NAME, historyTurns: Array.isArray(history) ? history.length : 0 });
+
+    // Build multi-turn contents from conversation history
+    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+
+    if (Array.isArray(history)) {
+      for (const turn of history) {
+        if (turn.role === 'user') {
+          contents.push({ role: 'user', parts: [{ text: turn.content }] });
+        } else if (turn.role === 'agent') {
+          contents.push({ role: 'model', parts: [{ text: turn.content }] });
+        }
+      }
+    }
+
+    // Add the current query as the final user turn
+    contents.push({ role: 'user', parts: [{ text: userPrompt }] });
 
     // Generate content with streaming
     const result = await model.generateContentStream({
-      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      contents,
       generationConfig: {
         maxOutputTokens: MAX_TOKENS,
         temperature: TEMPERATURE,

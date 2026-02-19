@@ -11,12 +11,18 @@ import { getBasePrompt } from './prompts/base';
 import { getTransactionSearchPrompt } from './prompts/transactionSearch';
 import { getSpendingSummaryPrompt } from './prompts/spendingSummary';
 import { getFundTransferPrompt } from './prompts/fundTransfer';
+import { getAccountOverviewPrompt } from './prompts/accountOverview';
+import { getBillPaymentPrompt } from './prompts/billPayment';
+import { getCardManagementPrompt } from './prompts/cardManagement';
 import { getGeneralPrompt } from './prompts/general';
 
 const scenarioPrompts: Record<ScenarioType, () => string> = {
   'transaction-search': getTransactionSearchPrompt,
   'spending-summary': getSpendingSummaryPrompt,
   'fund-transfer': getFundTransferPrompt,
+  'account-overview': getAccountOverviewPrompt,
+  'bill-payment': getBillPaymentPrompt,
+  'card-management': getCardManagementPrompt,
   'unknown': getGeneralPrompt,
 };
 

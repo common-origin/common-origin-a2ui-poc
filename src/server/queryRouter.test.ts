@@ -53,6 +53,30 @@ describe('analyzeQuery', () => {
     expect(analyzeQuery('Move money from checking').scenario).toBe('fund-transfer');
   });
 
+  // ── Account overview ───────────────────────────────────────────────
+
+  it('detects account overview', () => {
+    expect(analyzeQuery('Show my accounts').scenario).toBe('account-overview');
+    expect(analyzeQuery('What is my balance?').scenario).toBe('account-overview');
+    expect(analyzeQuery('Account overview').scenario).toBe('account-overview');
+  });
+
+  // ── Bill payment ───────────────────────────────────────────────────
+
+  it('detects bill payment', () => {
+    expect(analyzeQuery('Pay a bill').scenario).toBe('bill-payment');
+    expect(analyzeQuery('BPAY Telstra').scenario).toBe('bill-payment');
+    expect(analyzeQuery('Pay my electricity bill').scenario).toBe('bill-payment');
+  });
+
+  // ── Card management ────────────────────────────────────────────────
+
+  it('detects card management', () => {
+    expect(analyzeQuery('Freeze my card').scenario).toBe('card-management');
+    expect(analyzeQuery('I lost my card').scenario).toBe('card-management');
+    expect(analyzeQuery('Manage my card settings').scenario).toBe('card-management');
+  });
+
   // ── Entity extraction ──────────────────────────────────────────────
 
   it('extracts dollar amounts', () => {

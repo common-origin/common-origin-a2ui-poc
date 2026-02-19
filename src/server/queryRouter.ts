@@ -5,7 +5,7 @@
  * This enables a chat-like interface where users can ask for different banking tasks.
  */
 
-export type ScenarioType = 'transaction-search' | 'spending-summary' | 'fund-transfer' | 'unknown';
+export type ScenarioType = 'transaction-search' | 'spending-summary' | 'fund-transfer' | 'account-overview' | 'bill-payment' | 'card-management' | 'unknown';
 
 export interface QueryAnalysis {
   scenario: ScenarioType;
@@ -58,6 +58,48 @@ export function analyzeQuery(query: string): QueryAnalysis {
     /send.*\$\d+/i,
   ];
 
+  // Account overview patterns
+  const accountPatterns = [
+    /show.*account/i,
+    /my.*account/i,
+    /account.*balance/i,
+    /account.*overview/i,
+    /what.*balance/i,
+    /how much.*have/i,
+    /dashboard/i,
+    /account.*summary/i,
+  ];
+
+  // Bill payment patterns
+  const billPatterns = [
+    /pay.*bill/i,
+    /bpay/i,
+    /bill.*pay/i,
+    /pay.*telstra/i,
+    /pay.*agl/i,
+    /pay.*electricity/i,
+    /pay.*gas/i,
+    /pay.*internet/i,
+    /upcoming.*bill/i,
+    /due.*bill/i,
+    /scheduled.*payment/i,
+  ];
+
+  // Card management patterns
+  const cardPatterns = [
+    /freeze.*card/i,
+    /unfreeze.*card/i,
+    /block.*card/i,
+    /lock.*card/i,
+    /manage.*card/i,
+    /card.*limit/i,
+    /lost.*card/i,
+    /stolen.*card/i,
+    /card.*detail/i,
+    /card.*setting/i,
+    /replace.*card/i,
+  ];
+
   // Check for empty state keywords
   const isEmptyState = /empty.*state|no.*result|nothing|clear/i.test(lowerQuery);
 
@@ -65,7 +107,13 @@ export function analyzeQuery(query: string): QueryAnalysis {
   let scenario: ScenarioType = 'unknown';
   let intent = '';
 
-  if (transferPatterns.some(pattern => pattern.test(lowerQuery))) {
+  if (cardPatterns.some(pattern => pattern.test(lowerQuery))) {
+    scenario = 'card-management';
+    intent = 'User wants to manage their card';
+  } else if (billPatterns.some(pattern => pattern.test(lowerQuery))) {
+    scenario = 'bill-payment';
+    intent = 'User wants to pay a bill';
+  } else if (transferPatterns.some(pattern => pattern.test(lowerQuery))) {
     scenario = 'fund-transfer';
     intent = 'User wants to transfer money between accounts';
   } else if (spendingPatterns.some(pattern => pattern.test(lowerQuery))) {
@@ -74,6 +122,9 @@ export function analyzeQuery(query: string): QueryAnalysis {
   } else if (transactionPatterns.some(pattern => pattern.test(lowerQuery)) || isEmptyState) {
     scenario = 'transaction-search';
     intent = isEmptyState ? 'User wants to see empty state' : 'User wants to search transactions';
+  } else if (accountPatterns.some(pattern => pattern.test(lowerQuery))) {
+    scenario = 'account-overview';
+    intent = 'User wants to see their accounts';
   }
 
   // Extract entities
@@ -121,8 +172,11 @@ export function analyzeQuery(query: string): QueryAnalysis {
 export function getUnknownQueryResponse(): string {
   return `I can help you with:
 • Finding transactions (e.g., "Show my Woolworths transactions")
-• Viewing spending summaries (e.g., "How much did I spend last month?")
-• Transferring money (e.g., "Transfer $100 to savings")
+• Viewing spending summaries (e.g., "How much did I spend this month?")
+• Transferring money (e.g., "Transfer $200 to savings")
+• Viewing your accounts (e.g., "Show my accounts")
+• Paying bills (e.g., "Pay a bill")
+• Managing your cards (e.g., "Freeze my card")
 
 What would you like to do?`;
 }

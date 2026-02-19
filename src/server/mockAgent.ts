@@ -16,18 +16,19 @@ import { CATALOG_ID } from '../a2ui/constants';
 
 /**
  * Transaction data for demo - Australian retailers & realistic banking data
+ * Consistent with Sarah Chen's Everyday Account (••••7890)
  */
 const MOCK_TRANSACTIONS = [
-  { id: 'tx1', merchant: 'Woolworths', date: '2026-02-10', amount: -87.43, category: 'shopping', status: 'completed' },
-  { id: 'tx2', merchant: 'Caltex Epping', date: '2026-02-09', amount: -52.00, category: 'transport', status: 'completed' },
-  { id: 'tx3', merchant: 'Netflix Australia', date: '2026-02-08', amount: -22.99, category: 'entertainment', status: 'completed' },
-  { id: 'tx4', merchant: 'The Coffee Club', date: '2026-02-08', amount: -6.75, category: 'dining', status: 'completed' },
-  { id: 'tx5', merchant: 'Kmart Doncaster', date: '2026-02-07', amount: -42.36, category: 'shopping', status: 'completed' },
-  { id: 'tx6', merchant: 'Woolworths Metro', date: '2026-02-07', amount: -34.20, category: 'shopping', status: 'completed' },
-  { id: 'tx7', merchant: 'AGL Energy', date: '2026-02-06', amount: -189.50, category: 'bills', status: 'completed' },
-  { id: 'tx8', merchant: 'Bunnings Warehouse', date: '2026-02-05', amount: -127.85, category: 'shopping', status: 'completed' },
-  { id: 'tx9', merchant: 'Uber Eats', date: '2026-02-04', amount: -28.90, category: 'dining', status: 'completed' },
-  { id: 'tx10', merchant: 'JB Hi-Fi', date: '2026-02-03', amount: -299.00, category: 'shopping', status: 'pending' },
+  { id: 'tx1', merchant: 'Woolworths Metro CBD', date: '2026-02-18', amount: -87.43, category: 'shopping', status: 'completed' },
+  { id: 'tx2', merchant: 'The Coffee Club', date: '2026-02-18', amount: -8.50, category: 'dining', status: 'completed' },
+  { id: 'tx3', merchant: 'Uber Eats', date: '2026-02-18', amount: -27.24, category: 'dining', status: 'pending' },
+  { id: 'tx4', merchant: 'Caltex Epping', date: '2026-02-17', amount: -65.00, category: 'transport', status: 'completed' },
+  { id: 'tx5', merchant: 'Netflix Australia', date: '2026-02-15', amount: -22.99, category: 'entertainment', status: 'completed' },
+  { id: 'tx6', merchant: 'AGL Energy', date: '2026-02-15', amount: -189.00, category: 'bills', status: 'completed' },
+  { id: 'tx7', merchant: 'Kmart Doncaster', date: '2026-02-14', amount: -42.36, category: 'shopping', status: 'completed' },
+  { id: 'tx8', merchant: 'Woolworths Doncaster', date: '2026-02-14', amount: -67.20, category: 'shopping', status: 'completed' },
+  { id: 'tx9', merchant: 'Bunnings Warehouse', date: '2026-02-12', amount: -127.85, category: 'shopping', status: 'completed' },
+  { id: 'tx10', merchant: 'JB Hi-Fi', date: '2026-02-10', amount: -299.00, category: 'shopping', status: 'pending' },
 ];
 
 /** v0.9: createSurface is always the first message */

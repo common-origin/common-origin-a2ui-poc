@@ -13,13 +13,16 @@ import { CATALOG_ID } from '../a2ui/constants';
 
 /**
  * Spending data by category - Australian context
+ * Consistent with Sarah Chen's spending patterns
  */
 const SPENDING_DATA = [
-  { category: 'Groceries', amount: 487.23, percentage: 28, trend: 'up', transactions: 12 },
-  { category: 'Transport', amount: 342.50, percentage: 20, trend: 'down', transactions: 8 },
-  { category: 'Entertainment', amount: 215.99, percentage: 12, trend: 'up', transactions: 6 },
-  { category: 'Dining', amount: 389.45, percentage: 23, trend: 'up', transactions: 15 },
-  { category: 'Shopping', amount: 298.67, percentage: 17, trend: 'same', transactions: 5 },
+  { category: 'Groceries', amount: 620.00, percentage: 22, trend: 'up', transactions: 12 },
+  { category: 'Bills & Utilities', amount: 520.00, percentage: 18, trend: 'same', transactions: 3 },
+  { category: 'Shopping', amount: 480.00, percentage: 17, trend: 'up', transactions: 6 },
+  { category: 'Dining', amount: 385.00, percentage: 14, trend: 'up', transactions: 9 },
+  { category: 'Transport', amount: 342.50, percentage: 12, trend: 'down', transactions: 7 },
+  { category: 'Health', amount: 145.00, percentage: 5, trend: 'same', transactions: 2 },
+  { category: 'Entertainment', amount: 78.00, percentage: 3, trend: 'down', transactions: 3 },
 ];
 
 const TOTAL_SPENDING = SPENDING_DATA.reduce((sum, cat) => sum + cat.amount, 0);

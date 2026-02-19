@@ -13,11 +13,12 @@ import { CATALOG_ID } from '../a2ui/constants';
 
 /**
  * Mock account data - Australian bank accounts
+ * Consistent with Sarah Chen's accounts
  */
 const ACCOUNTS = [
-  { value: 'transaction', label: 'Transaction Account (\u2022\u2022\u2022\u2022 4532) - $5,280.42' },
-  { value: 'savings', label: 'Savings Account (\u2022\u2022\u2022\u2022 8291) - $12,450.00' },
-  { value: 'offset', label: 'Offset Account (\u2022\u2022\u2022\u2022 1847) - $25,000.00' },
+  { value: 'transaction', label: 'Everyday Account (••••7890) - $3,247.85' },
+  { value: 'savings', label: 'Goal Saver (••••4567) - $12,450.00' },
+  { value: 'offset', label: 'Offset Account (••••1847) - $25,000.00' },
 ];
 
 /**
@@ -200,6 +201,7 @@ export function getFundTransferMessages(): A2UIMessage[] {
             label: 'Cancel',
             variant: 'secondary',
             size: 'medium',
+            action: { name: 'cancel', context: [] },
           },
           {
             id: 'submit-btn',
@@ -207,7 +209,16 @@ export function getFundTransferMessages(): A2UIMessage[] {
             label: 'Review Transfer',
             variant: 'primary',
             size: 'medium',
-            action: { eventType: 'click' },
+            action: {
+              name: 'review_transfer',
+              context: [
+                { key: 'fromAccount', value: { path: '/fromAccount' } },
+                { key: 'toAccount', value: { path: '/toAccount' } },
+                { key: 'amount', value: { path: '/amount' } },
+                { key: 'memo', value: { path: '/memo' } },
+                { key: 'instant', value: { path: '/instant' } },
+              ],
+            },
           },
         ],
       },
