@@ -15,6 +15,7 @@ import type {
   A2UIMessage,
   SurfaceState,
   ComponentNode,
+  UserActionMessage,
 } from '../a2ui/types';
 
 const log = createLogger('Surface');
@@ -46,14 +47,25 @@ export function A2UISurface({
   });
 
   /**
-   * Handle actions from rendered components
-   * This enables two-way communication: UI -> State -> Agent
+   * Handle actions from rendered components.
+   * Supports both:
+   * - v0.9 spec UserActionMessage (from buttons with action.name + context)
+   * - Legacy action objects (eventType-based, for backward compat)
    */
   const handleAction = useCallback((action: any) => {
-    console.log('[A2UISurface] Action received:', action);
-    log.debug('Action received', { eventType: action?.eventType, dataPath: action?.dataPath });
+    log.debug('Action received', { action });
 
-    // Update data model if action includes data updates
+    // Check if this is a v0.9 spec UserActionMessage (resolved by catalog)
+    if (action?.userAction?.name) {
+      console.log('[A2UISurface] UserAction:', action.userAction.name, action.userAction.context);
+      // Pass the full UserActionMessage to parent — the page will send it to the agent
+      if (onAction) {
+        onAction(action as UserActionMessage);
+      }
+      return;
+    }
+
+    // Legacy: Update data model if action includes data updates
     if (action.updateDataModel) {
       setSurface((prev) => {
         const newDataModel = new Map(prev.dataModel);
@@ -212,7 +224,7 @@ export function A2UISurface({
   const renderSurface = () => {
     if (!surface.rendering || !surface.root) {
       return (
-        <div className={className} style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+        <div className={className} role="status" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted, #666)' }}>
           Waiting for UI generation...
         </div>
       );
@@ -221,7 +233,7 @@ export function A2UISurface({
     const rootNode = surface.components.get(surface.root);
     if (!rootNode) {
       return (
-        <div className={className} style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+        <div className={className} role="status" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted, #666)' }}>
           Root component not found: {surface.root}
         </div>
       );

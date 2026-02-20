@@ -1,160 +1,72 @@
 # Deployment Guide: Vercel
 
-This guide walks through deploying the A2UI Banking Demo to Vercel.
-
 ## Prerequisites
 
-- GitHub account
-- Vercel account (sign up at [vercel.com](https://vercel.com))
-- Git repository pushed to GitHub
+- GitHub account with the repo pushed
+- Vercel account ([vercel.com](https://vercel.com))
 
-## Step 1: Push to GitHub
-
-```bash
-cd /Users/olliemacky/Git/commonorigin/common-origin-a2ui-poc
-
-# Initialize git if not already done
-git init
-
-# Add all files
-git add .
-
-# Commit
-git commit -m "Initial commit: A2UI Banking Demo with 3 scenarios"
-
-# Add remote (replace with your repo URL)
-git remote add origin https://github.com/YOUR_USERNAME/common-origin-a2ui-poc.git
-
-# Push to GitHub
-git push -u origin main
-```
-
-## Step 2: Connect to Vercel
+## 1. Connect Repository
 
 1. Go to [vercel.com/new](https://vercel.com/new)
-2. Click "Import Git Repository"
-3. Select your GitHub repository: `common-origin-a2ui-poc`
-4. Vercel will auto-detect Next.js configuration
+2. Import your GitHub repository: `common-origin-a2ui-poc`
+3. Vercel auto-detects the Next.js framework
 
-## Step 3: Configure Build Settings
+Build settings are configured in `vercel.json`:
+- **Framework**: Next.js
+- **Build command**: `pnpm build`
+- **Install command**: `pnpm install`
+- **Agent API timeout**: 60s (for Gemini streaming)
 
-Vercel should automatically detect:
-- **Framework Preset**: Next.js
-- **Build Command**: `pnpm build` (or `npm run build`)
-- **Output Directory**: `.next`
-- **Install Command**: `pnpm install` (or `npm install`)
+## 2. Set Environment Variables
 
-If using pnpm, ensure "Use pnpm" is enabled in settings.
+In Vercel project settings → Environment Variables, add:
 
-## Step 4: Set Environment Variables
+| Variable | Value | Required |
+|----------|-------|----------|
+| `NEXT_PUBLIC_AGENT_MODE` | `mock` | Yes |
+| `GEMINI_API_KEY` | Your API key | Only for real agent mode |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | No (default) |
 
-In the Vercel project settings, add:
+**Mock mode** (no API key needed): Set `NEXT_PUBLIC_AGENT_MODE=mock`
 
-```
-NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_api_key_here
-NEXT_PUBLIC_AGENT_MODE=mock
-```
+**Real agent mode**: Set `NEXT_PUBLIC_AGENT_MODE=real` and provide `GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/app/apikey).
 
-**For Phase 5 (Real Agent Integration):**
-- Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-- Set `NEXT_PUBLIC_AGENT_MODE=real` to enable live agent
+## 3. Deploy
 
-**For Demo/Backup:**
-- Keep `NEXT_PUBLIC_AGENT_MODE=mock` to use mock agent
-- No API key required for mock mode
+Click **Deploy**. Vercel will build and deploy in ~2 minutes.
 
-## Step 5: Deploy
-
-Click **Deploy**
-
-Vercel will:
-1. Clone your repository
-2. Install dependencies
-3. Build the Next.js app
-4. Deploy to a production URL
-
-Deployment typically takes 2-3 minutes.
-
-## Step 6: Verify Deployment
-
-Once deployed, Vercel provides:
-- **Production URL**: `https://common-origin-a2ui-poc.vercel.app`
-- **Preview URLs**: For each branch/PR
-
-Test all three scenarios:
-1. "Find my Starbucks transactions" → Transaction Search
-2. "Show spending summary" → Spending Summary
-3. "Transfer $100 to savings" → Fund Transfer
-
-## Step 7: Custom Domain (Optional)
-
-To add a custom domain:
-1. Go to Project Settings → Domains
-2. Add your domain (e.g., `a2ui-demo.yourdomain.com`)
-3. Update DNS records as instructed by Vercel
+After deployment, test all three scenarios:
+1. "Find my Woolworths transactions" → Transaction search
+2. "Show spending summary" → Spending summary
+3. "Transfer $100 to savings" → Fund transfer
 
 ## Continuous Deployment
 
-Vercel automatically:
-- **Deploys on push to main**: Production deployment
-- **Deploys on pull requests**: Preview deployments
-- **Redeploys on dependency updates**: Automatic rebuilds
+- **Push to main** → automatic production deployment
+- **Pull requests** → automatic preview deployments
 
-## Environment Variables Per Environment
+## Environment Per Branch
 
-You can set different env vars for:
-- **Production**: Live demo with real agent
-- **Preview**: Testing with mock agent
-- **Development**: Local development settings
-
-## Monitoring & Logs
-
-View deployment logs at:
-- **Deployments tab**: Build logs, errors, warnings
-- **Functions tab**: Serverless function logs (if using real agent API)
-- **Analytics**: Traffic, performance metrics (requires Pro plan)
+Set different variables per environment in Vercel:
+- **Production**: `NEXT_PUBLIC_AGENT_MODE=real` with API key
+- **Preview**: `NEXT_PUBLIC_AGENT_MODE=mock`
 
 ## Troubleshooting
 
-### Build Fails
+### Build fails
+- Run `pnpm build` locally to reproduce
+- Check Vercel build logs for TypeScript or dependency errors
 
-**Common issues:**
-- Missing dependencies: Run `pnpm install` locally first
-- TypeScript errors: Fix errors shown in build log
-- Environment variables: Ensure all required vars are set
+### Agent API times out
+- The `vercel.json` sets a 60s function timeout for the agent route
+- Gemini streaming typically responds in 5-15s
+- If consistently slow, check Gemini API quotas
 
-### Runtime Errors
+### Mock agent works but real agent fails
+- Verify `GEMINI_API_KEY` is set correctly in Vercel env vars
+- Check function logs in Vercel dashboard → Logs tab
+- The app auto-falls back to mock agent on real agent failure
 
-**Check:**
-- Browser console for client-side errors
-- Vercel function logs for server-side errors
-- Network tab for failed requests
-
-### Performance
-
-**Optimization tips:**
-- Enable Vercel Analytics for insights
-- Use Next.js Image optimization
-- Monitor Core Web Vitals
-- Consider Edge Functions for faster response times
-
-## Rollback
-
-To rollback to a previous deployment:
-1. Go to Deployments tab
-2. Find the working deployment
-3. Click "..." → "Promote to Production"
-
-## Next Steps
-
-- Add real Gemini agent integration (Phase 5)
-- Set up staging environment
-- Configure custom domain
-- Enable Vercel Analytics
-- Set up monitoring alerts
-
----
-
-**Demo URL**: Your URL will be at `https://YOUR_PROJECT.vercel.app`
-
-Share this URL in interviews to demonstrate live A2UI capabilities! 🚀
+### Design system components not rendering
+- Ensure `@common-origin/design-system` is accessible from Vercel's build environment
+- Check if `.npmrc` is needed for private registry access

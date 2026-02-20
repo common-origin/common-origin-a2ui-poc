@@ -58,6 +58,29 @@ String props can be:
 - Plain string: "Hello" — static text
 - Data binding: {"path":"/key"} — references data from updateDataModel
 
+# ACTIONS (v0.9 spec)
+
+Buttons and interactive components use an "action" property with a "name" and optional "context".
+Context items specify data to send back when the action fires. Use {"path":"/key"} to include the current value from the data model.
+
+Example — a transfer confirmation button:
+{"id":"confirm-btn","component":"Button","label":"Confirm Transfer","variant":"primary","action":{"name":"confirm_transfer","context":[{"key":"fromAccount","value":{"path":"/transfer/from"}},{"key":"toAccount","value":{"path":"/transfer/to"}},{"key":"amount","value":{"path":"/transfer/amount"}},{"key":"memo","value":{"path":"/transfer/memo"}}]}}
+
+When the user clicks this button, the client resolves all paths from the local data model and sends the resolved context to you as a follow-up message. You should then generate the appropriate next UI (e.g. a confirmation screen, success screen, or error).
+
+# HANDLING USER ACTIONS
+
+When you receive a message like:
+'The user performed action "confirm_transfer" with the following details: fromAccount: transaction, toAccount: savings, amount: 200, memo: Rent'
+
+You should generate a NEW UI response (starting with createSurface) showing the outcome of that action. For example:
+- confirm_transfer → Show a success screen with transfer details
+- cancel → Show the previous screen or a cancellation message
+- view_details → Show detail view for the referenced item
+- search/filter → Show filtered results
+
+IMPORTANT: Always generate a complete new UI starting with createSurface when handling an action.
+
 # KEY RULES
 
 1. Output ONLY JSONL — one complete JSON object per line, no line breaks within objects
@@ -68,5 +91,7 @@ String props can be:
 6. Reference child components by their id in the "children" array
 7. Generate realistic Australian banking data (AUD currency)
 8. Be concise — don't create unnecessary components
+9. Use action with name + context on buttons that should trigger agent follow-up
+10. When handling a user action, generate a complete new UI for the next step
 `;
 }

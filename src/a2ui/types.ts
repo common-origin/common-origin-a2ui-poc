@@ -97,10 +97,65 @@ export interface DataBinding {
   path: string; // JSON Pointer, e.g. "/transaction/merchant"
 }
 
+/**
+ * Legacy action binding — kept for backward compat with existing mock agents.
+ * Will be phased out in favour of ActionDefinition.
+ */
 export interface ActionBinding {
   eventType: 'click' | 'change' | 'dismiss' | 'submit';
   dataPath?: string;
   value?: string | number | boolean;
+}
+
+// ---------------------------------------------------------------------------
+// v0.9 Spec Action Types
+// ---------------------------------------------------------------------------
+
+/**
+ * An action definition on a Button or interactive component (v0.9 spec).
+ * 
+ * When the user triggers this action, the client resolves all context paths
+ * from the local data model and sends a UserAction message to the agent.
+ *
+ * Example:
+ * {
+ *   name: "confirm_transfer",
+ *   context: [
+ *     { key: "fromAccount", value: { path: "/transfer/from" } },
+ *     { key: "amount", value: { path: "/transfer/amount" } },
+ *     { key: "source", value: "transfer_form" }
+ *   ]
+ * }
+ */
+export interface ActionDefinition {
+  /** Action name — identifies the action for the agent (e.g. "confirm_transfer") */
+  name: string;
+  /** Context items: key-value pairs where values can be literal or data-model paths */
+  context?: ActionContextItem[];
+}
+
+export interface ActionContextItem {
+  key: string;
+  value: string | number | boolean | DataBinding;
+}
+
+/**
+ * Client-to-server message sent when a user triggers an action (v0.9 spec).
+ * The client resolves all context paths before sending.
+ */
+export interface UserActionMessage {
+  userAction: {
+    /** The action name from the ActionDefinition */
+    name: string;
+    /** Surface where the action originated */
+    surfaceId: string;
+    /** Component ID that triggered the action */
+    sourceComponentId: string;
+    /** ISO 8601 timestamp */
+    timestamp: string;
+    /** Resolved context — all paths have been replaced with actual values */
+    context: Record<string, unknown>;
+  };
 }
 
 // ---------------------------------------------------------------------------

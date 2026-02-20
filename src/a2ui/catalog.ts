@@ -51,6 +51,9 @@ import type {
   NumberOrPath,
   DataBinding,
   SurfaceState,
+  ActionDefinition,
+  ActionContextItem,
+  UserActionMessage,
 } from './types';
 
 // Re-export CATALOG_ID from constants for backward compatibility
@@ -124,6 +127,57 @@ function resolveNumber(
   if (binding === undefined || binding === null) return 0;
   if (typeof binding === 'number') return binding;
   return parseFloat(resolveBinding(binding, dataModel)) || 0;
+}
+
+/**
+ * Resolve a v0.9 spec ActionDefinition into a UserActionMessage.
+ *
+ * This is the core of the action-to-agent feedback loop: when a Button
+ * has an `action` with `name` + `context`, we resolve all context paths
+ * from the local data model and produce a fully-resolved UserActionMessage.
+ */
+function resolveAction(
+  action: ActionDefinition,
+  sourceComponentId: string,
+  surfaceId: string,
+  dataModel: Map<string, unknown>
+): UserActionMessage {
+  const resolvedContext: Record<string, unknown> = {};
+
+  if (action.context) {
+    for (const item of action.context) {
+      if (item.value && typeof item.value === 'object' && 'path' in item.value) {
+        // Resolve data-model path
+        resolvedContext[item.key] = resolveBinding(item.value as DataBinding, dataModel);
+      } else {
+        // Literal value
+        resolvedContext[item.key] = item.value;
+      }
+    }
+  }
+
+  return {
+    userAction: {
+      name: action.name,
+      surfaceId,
+      sourceComponentId,
+      timestamp: new Date().toISOString(),
+      context: resolvedContext,
+    },
+  };
+}
+
+/**
+ * Check if a value looks like a v0.9 spec ActionDefinition
+ * (has `name` string property, distinguishing it from legacy eventType-based actions)
+ */
+function isSpecAction(action: unknown): action is ActionDefinition {
+  return (
+    action !== null &&
+    typeof action === 'object' &&
+    'name' in action &&
+    typeof (action as ActionDefinition).name === 'string'
+  );
 }
 
 /**
@@ -355,12 +409,25 @@ export function renderNode(
     case 'Button': {
       const label = resolveBinding(node.label as StringOrPath, dm);
       const action = (node.action || node.onClick) as any;
+      
+      let handleClick: (() => void) | undefined;
+      if (action && isSpecAction(action)) {
+        // v0.9 spec: resolve context paths and produce UserActionMessage
+        handleClick = () => {
+          const resolved = resolveAction(action, id, surface.surfaceId, dm);
+          onAction?.(resolved);
+        };
+      } else if (action) {
+        // Legacy format: pass through as-is
+        handleClick = () => onAction?.(action);
+      }
+      
       return React.createElement(Button, {
         key: id,
         variant: node.variant || 'primary',
         size: node.size || 'medium',
         disabled: node.disabled || false,
-        onClick: action ? () => onAction?.(action) : undefined,
+        onClick: handleClick,
         children: label,
       });
     }
@@ -514,6 +581,22 @@ export function renderNode(
       const amount = resolveNumber(node.amount as NumberOrPath, dm);
       const date = resolveBinding(node.date as StringOrPath, dm);
       const description = node.description ? resolveBinding(node.description as StringOrPath, dm) : undefined;
+      
+      // TransactionListItem uses onClick (per catalog schema), not action.
+      // onClick can carry the spec action format (name + context) for drill-down.
+      const onClick = node.onClick as any;
+      let handleClick: (() => void) | undefined;
+      if (onClick && isSpecAction(onClick)) {
+        // v0.9 spec format on onClick: resolve context paths and produce UserActionMessage
+        handleClick = () => {
+          const resolved = resolveAction(onClick, id, surface.surfaceId, dm);
+          onAction?.(resolved);
+        };
+      } else if (onClick) {
+        // Legacy format: pass through as-is
+        handleClick = () => onAction?.(onClick);
+      }
+      
       return React.createElement(TransactionListItem, {
         key: id,
         merchant,
@@ -526,7 +609,7 @@ export function renderNode(
         hasReceipt: node.hasReceipt,
         hasNote: node.hasNote,
         currency: node.currency || 'AUD',
-        onClick: node.onClick ? () => onAction?.(node.onClick) : undefined,
+        onClick: handleClick,
       });
     }
 

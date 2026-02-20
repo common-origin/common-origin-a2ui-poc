@@ -65,6 +65,11 @@ const RetryButton = styled.button`
   &:hover {
     background: #ffca28;
   }
+
+  &:focus-visible {
+    outline: 2px solid #856404;
+    outline-offset: 2px;
+  }
 `;
 
 export class A2UIErrorBoundary extends Component<Props, State> {

@@ -20,6 +20,14 @@ const log = createLogger('Agent');
 const AGENT_MODE = process.env.NEXT_PUBLIC_AGENT_MODE || 'mock';
 
 /**
+ * A single turn in a conversation
+ */
+export interface ConversationTurn {
+  role: 'user' | 'agent';
+  content: string;
+}
+
+/**
  * Call the real Gemini agent via API route
  * 
  * @param query - User's banking query
@@ -29,7 +37,8 @@ const AGENT_MODE = process.env.NEXT_PUBLIC_AGENT_MODE || 'mock';
 export async function callRealAgent(
   query: string,
   onMessage: (message: A2UIMessage) => void,
-  scenario?: string
+  scenario?: string,
+  history?: ConversationTurn[]
 ): Promise<void> {
   let messageCount = 0;
 
@@ -39,7 +48,7 @@ export async function callRealAgent(
     const response = await fetch('/api/agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, scenario }),
+      body: JSON.stringify({ query, scenario, history: history || [] }),
     });
 
     if (!response.ok) {
@@ -156,7 +165,8 @@ export async function callRealAgent(
 export async function callMockAgent(
   query: string,
   onMessage: (message: A2UIMessage) => void,
-  scenario?: string
+  scenario?: string,
+  _history?: ConversationTurn[]
 ): Promise<void> {
   try {
     // Route to appropriate mock agent based on scenario
@@ -201,18 +211,20 @@ export async function callAgent(
     forceMode?: 'mock' | 'real';  // Override default agent mode
     onError?: (error: Error) => void;  // Custom error handler
     retryOnError?: boolean;  // Retry with mock agent if real agent fails
+    history?: ConversationTurn[];  // Conversation history for multi-turn
   }
 ): Promise<void> {
   const mode = options?.forceMode || AGENT_MODE;
   const retryWithMock = options?.retryOnError !== false; // Default: true
 
   try {
+    const history = options?.history;
     if (mode === 'real') {
-      log.info('Using real Gemini agent', { query: truncate(query, 60), scenario });
-      await callRealAgent(query, onMessage, scenario);
+      log.info('Using real Gemini agent', { query: truncate(query, 60), scenario, historyLength: history?.length || 0 });
+      await callRealAgent(query, onMessage, scenario, history);
     } else {
       log.info('Using mock agent', { query: truncate(query, 60), scenario });
-      await callMockAgent(query, onMessage, scenario);
+      await callMockAgent(query, onMessage, scenario, history);
     }
   } catch (error) {
     const err = error instanceof Error ? error : new Error('Unknown error');

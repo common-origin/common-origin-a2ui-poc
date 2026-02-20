@@ -15,111 +15,58 @@ This POC demonstrates A2UI v0.9 integration with the Common Origin Design System
 - [x] ~~React context for surface state management~~
 - [x] ~~Dark mode support via CSS custom properties~~
 - [x] ~~Test suite (62 tests, Vitest)~~
-- [ ] Deploy to Vercel with stable URL
-- [ ] Multi-turn conversation (agent context across messages)
-- [ ] Mobile-responsive layout optimisation
-- [ ] Accessibility audit (WCAG 2.1 AA)
+- [x] ~~Deploy to Vercel with stable URL~~
+- [x] ~~Multi-turn conversation (agent context across messages)~~
+- [x] ~~Mobile-responsive layout optimisation~~
+- [x] ~~Accessibility audit (WCAG 2.1 AA)~~
+- [x] ~~Action-to-agent feedback loop (v0.9 spec actions)~~
 
-## Medium-Term: Publishable Libraries
+## In Progress: Making It Feel Real
 
-The A2UI + design system integration pattern should be extracted into reusable packages for the wider organisation.
+The goal is to demonstrate a banking experience where the user can interact naturally — type a request, see dynamic UI, click buttons that produce follow-up screens — all powered by an AI agent generating A2UI.
 
-### `@common-origin/a2ui-catalog`
+### Action Feedback Loop (Done)
+- [x] v0.9 spec `action` with `name` + `context` on Button components
+- [x] `onClick` with `name` + `context` on TransactionListItem (uses existing catalog schema)
+- [x] Client resolves context paths from data model before sending to agent
+- [x] Agent receives user actions and generates follow-up UI
+- [x] System prompts updated with action handling instructions + examples
+- [x] Server-side scenario detection via `analyzeQuery` fallback in API route
+- [x] Fixed scenario name mismatch (`transaction-finder` → `transaction-search`)
 
-A standalone, framework-agnostic package containing the catalog definition and validation logic.
+### Interactive Flows (Validated end-to-end with Gemini)
+- [x] Transfer: form → review → confirm → success
+- [x] Transaction search: drill-down into transaction details on click
+- [x] Spending summary: "Compare to last month" and "View all transactions" action buttons
+- [ ] Cancel / back navigation between screens
 
-**Contents:**
-- `common_origin_catalog_definition.json` — JSON Schema 2020-12 defining all components
-- `common_origin_catalog_rules.txt` — Natural language rules for LLM system prompts
-- `validateComponent()` — Validate a single component node against the schema
-- `validateComponentsMessage()` — Batch validation with summary
-- `VALID_COMPONENT_TYPES` — Set of allowed component names
-- `CATALOG_ID` — Canonical catalog identifier string
+### Polish & Realism
+- [x] All three scenarios validated end-to-end with Gemini (not just mock)
+- [ ] Consistent, realistic Australian banking data across all agent responses
+- [ ] Smooth transitions between screens (loading states during action follow-ups)
+- [ ] Error recovery: retry on agent failure, user-friendly error messages
 
-**Use cases:**
-- LLM prompt engineering (include the schema + rules in system prompts)
-- Server-side validation of agent output before sending to clients
-- Client-side validation as a security layer
-- Testing: verify agent output conforms to catalog
+### Expand Banking Coverage
+- [ ] Account overview / balances scenario
+- [ ] Bill payments scenario
+- [ ] Card management scenario
+- [ ] Freeform banking queries (agent handles any banking prompt)
 
-**Publishing:**
-```
-@common-origin/a2ui-catalog
-├── dist/
-│   ├── index.js          # CJS
-│   ├── index.mjs         # ESM
-│   └── index.d.ts        # TypeScript types
-├── schema/
-│   ├── catalog_definition.json
-│   └── catalog_rules.txt
-└── package.json
-```
+## Long-Term (Beyond This POC)
 
-### `@common-origin/a2ui-react`
+If this POC validates the approach, the following directions are worth exploring:
 
-A React renderer that takes validated A2UI messages and renders them using `@common-origin/design-system` components. This is the catalog + rendering layer extracted from this POC.
+### Multi-Agent Banking
+- Specialised agents per banking domain (transactions, payments, investments)
+- A router agent delegates to task-specific agents, each producing A2UI
+- Follows the A2UI A2A extension pattern for multi-agent coordination
 
-**Contents:**
-- `A2UISurface` — Main renderer component
-- `A2UISurfaceProvider` — React context provider
-- `renderNode()` — Component tree renderer with security boundary
-- `useA2UISurface()` — Hook for dispatching messages to a surface
-- Error boundary component
-- URL sanitisation, depth limiting
+### Additional Renderers
+- Angular and Lit/Web Component renderers following A2UI's reference implementations
+- The catalog definition is already framework-agnostic and could be shared
 
-**Dependencies:**
-- `@common-origin/design-system` (peer dependency)
-- `@common-origin/a2ui-catalog` (for validation)
-- `react` ≥ 18 (peer dependency)
-
-**Publishing:**
-```
-@common-origin/a2ui-react
-├── dist/
-│   ├── index.js
-│   ├── index.mjs
-│   └── index.d.ts
-└── package.json
-```
-
-### Extraction Guide
-
-1. **Extract catalog package first** — it has no React dependencies
-2. **Extract renderer second** — it depends on the catalog package
-3. **Update this POC** to import from `@common-origin/a2ui-catalog` and `@common-origin/a2ui-react` instead of local `src/` modules
-4. **Add integration tests** that verify the published packages work together
-
-## Long-Term
-
-### Multi-Framework Support
-
-Following the A2UI specification's renderer pattern, consider additional renderers:
-
-| Framework | Package | Status |
-|-----------|---------|--------|
-| React | `@common-origin/a2ui-react` | Planned (extract from POC) |
-| Angular | `@common-origin/a2ui-angular` | Future — follow A2UI's Angular renderer pattern |
-| Lit/Web Components | `@common-origin/a2ui-lit` | Future — follow A2UI's Lit renderer pattern |
-
-The catalog package (`@common-origin/a2ui-catalog`) is framework-agnostic and would be shared across all renderers.
-
-### A2A (Agent-to-Agent) Integration
-
-The A2UI specification includes an [A2A extension](vendor/a2ui/specification/0.8/docs/v0.8-a2a-extension.md) for multi-agent coordination. This enables:
-
-- Specialised agents for different banking tasks (transactions, payments, investments)
-- Agent orchestration where a router agent delegates to task-specific agents
-- Each agent produces A2UI messages for its area of expertise
-
-### Design System Evolution
-
-- **Component analytics** — track which A2UI components agents use most to prioritise DS investment
-- **Agent-optimised variants** — add component variants specifically useful for agent-generated layouts (e.g., streaming-friendly skeletons, progressive disclosure patterns)
-- **Catalog versioning** — formal catalog version bumps aligned with design system releases, with backward compatibility rules
-
-### Security Hardening
-
-- **Content Security Policy** integration for rendered surfaces
-- **Rate limiting** on the agent API endpoint
-- **Audit logging** of all agent-generated UI for compliance review
-- **Formal security review** of the catalog boundary before production use
+### Production Hardening
+- Content Security Policy integration for rendered surfaces
+- Rate limiting on the agent API endpoint
+- Audit logging of all agent-generated UI for compliance review
+- Formal security review of the catalog boundary

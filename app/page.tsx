@@ -9,13 +9,14 @@
  * - All components come from trusted catalog
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { A2UISurface, useA2UISurface } from '@/src/components/A2UISurface';
 import { A2UIErrorBoundary } from '@/src/components/A2UIErrorBoundary';
-import { callAgent, getAgentMode, isRealAgentAvailable } from '@/src/lib/agentClient';
+import { callAgent, getAgentMode, isRealAgentAvailable, type ConversationTurn } from '@/src/lib/agentClient';
 import { analyzeQuery, getUnknownQueryResponse } from '@/src/server/queryRouter';
 import { CATALOG_ID } from '@/src/a2ui/catalog';
 import { createLogger } from '@/src/lib/logger';
+import type { UserActionMessage } from '@/src/a2ui/types';
 import styled from 'styled-components';
 import {
   Button,
@@ -40,6 +41,52 @@ const PageWrapper = styled.div`
     to {
       opacity: 1;
     }
+  }
+`;
+
+const PageContainer = styled.div`
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+
+  @media (max-width: 640px) {
+    padding: 1rem 0.75rem;
+  }
+`;
+
+const QueryRow = styled.div`
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+  max-width: 800px;
+  margin: 0 auto 2rem;
+
+  & > div:first-child {
+    flex: 1;
+  }
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 1.5rem;
+  }
+`;
+
+const SurfaceContainer = styled.main`
+  max-width: 800px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-radius: 1rem;
+  padding: 2rem;
+  box-shadow: 0 4px 6px var(--shadow);
+  border: 1px solid var(--border);
+  min-height: 400px;
+  transition: box-shadow 0.3s ease;
+
+  @media (max-width: 640px) {
+    padding: 1rem;
+    border-radius: 0.75rem;
+    min-height: 300px;
   }
 `;
 
@@ -97,6 +144,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [agentMode, setAgentMode] = useState<'mock' | 'real'>(getAgentMode());
   const [realAgentAvailable, setRealAgentAvailable] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<ConversationTurn[]>([]);
   const { sendMessage } = useA2UISurface('main');
 
   // Check if real agent is available on mount
@@ -124,15 +172,21 @@ export default function Home() {
     const analysis = analyzeQuery(queryToProcess);
     log.info('Query analysis', { query: queryToProcess, scenario: analysis.scenario, intent: analysis.intent });
 
-    // Map scenario to agent hint
+    // Map scenario to agent hint — must match ScenarioType values
     let scenarioHint: string | undefined;
     if (analysis.scenario === 'transaction-search') {
-      scenarioHint = 'transaction-finder';
+      scenarioHint = 'transaction-search';
     } else if (analysis.scenario === 'spending-summary') {
       scenarioHint = 'spending-summary';
     } else if (analysis.scenario === 'fund-transfer') {
       scenarioHint = 'fund-transfer';
     }
+
+    // Record the user turn in conversation history
+    const updatedHistory: ConversationTurn[] = [
+      ...conversationHistory,
+      { role: 'user', content: queryToProcess },
+    ];
 
     try {
       // Call unified agent interface
@@ -149,9 +203,16 @@ export default function Home() {
             log.error('Agent error', { message: err.message });
             setError(err.message);
           },
-          retryOnError: true, // Fallback to mock if real agent fails
+          retryOnError: true,
+          history: conversationHistory,
         }
       );
+
+      // Record the agent turn (summary of what was generated)
+      setConversationHistory([
+        ...updatedHistory,
+        { role: 'agent', content: `Generated ${analysis.scenario} UI for: "${queryToProcess}"` },
+      ]);
     } catch (error) {
       log.error('Error generating UI', { error: error instanceof Error ? error.message : String(error) });
       setError(error instanceof Error ? error.message : 'Failed to generate UI');
@@ -191,6 +252,100 @@ export default function Home() {
     }
   };
 
+  /**
+   * Handle UserAction from the A2UISurface (v0.9 spec action-to-agent feedback loop).
+   *
+   * When a user clicks a Button that has a spec-format action (name + context),
+   * the catalog resolves the context paths from the data model and produces
+   * a UserActionMessage. We convert that into a natural-language follow-up
+   * prompt and send it back to the agent so it can generate the next UI.
+   */
+  const handleUserAction = useCallback(async (action: unknown) => {
+    // Only handle v0.9 spec UserActionMessages
+    const msg = action as UserActionMessage;
+    if (!msg?.userAction?.name) return;
+
+    const { name, context, surfaceId } = msg.userAction;
+    log.info('UserAction received', { name, context });
+
+    // Compose a natural-language follow-up prompt describing the user action
+    const contextDescription = Object.entries(context)
+      .filter(([, v]) => v !== undefined && v !== '')
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(', ');
+
+    const followUpQuery = `The user performed action "${name}"${contextDescription ? ` with the following details: ${contextDescription}` : ''}. Generate the appropriate next UI screen.`;
+
+    // Send as a follow-up to the agent
+    setIsGenerating(true);
+    setError(null);
+
+    // Reset surface for new content
+    sendMessage({
+      deleteSurface: {
+        surfaceId: 'main',
+      },
+    });
+
+    // Add the user action as a conversation turn
+    const updatedHistory: ConversationTurn[] = [
+      ...conversationHistory,
+      { role: 'user', content: followUpQuery },
+    ];
+
+    try {
+      await callAgent(
+        followUpQuery,
+        (message) => {
+          log.debug('Action follow-up message', { type: Object.keys(message)[0] });
+          sendMessage(message);
+        },
+        undefined, // Let the agent figure out the scenario from context
+        {
+          forceMode: agentMode,
+          onError: (err) => {
+            log.error('Action follow-up error', { message: err.message });
+            setError(err.message);
+          },
+          retryOnError: true,
+          history: conversationHistory,
+        }
+      );
+
+      setConversationHistory([
+        ...updatedHistory,
+        { role: 'agent', content: `Handled action "${name}" — generated follow-up UI` },
+      ]);
+    } catch (error) {
+      log.error('Action follow-up failed', { error: error instanceof Error ? error.message : String(error) });
+      setError(error instanceof Error ? error.message : 'Failed to process action');
+
+      sendMessage({
+        createSurface: {
+          surfaceId: 'main',
+          catalogId: CATALOG_ID,
+        },
+      });
+      sendMessage({
+        updateComponents: {
+          surfaceId: 'main',
+          components: [
+            {
+              id: 'root',
+              component: 'Alert',
+              content: error instanceof Error ? error.message : 'Failed to process your action. Please try again.',
+              variant: 'error',
+              title: 'Error',
+            },
+          ],
+        },
+      });
+    }
+
+    setIsGenerating(false);
+    setHasGenerated(true);
+  }, [agentMode, conversationHistory, sendMessage]);
+
   const handleExampleClick = (example: string) => {
     setQuery(example);
     handleSubmit(example);
@@ -198,7 +353,7 @@ export default function Home() {
 
   return (
     <PageWrapper>
-      <Box style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+      <PageContainer>
         {/* Header */}
         <header style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{ marginBottom: '0.5rem' }}>
@@ -215,8 +370,8 @@ export default function Home() {
 
         {/* Agent Mode Toggle */}
         {realAgentAvailable && (
-          <Box style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center', gap: '1rem', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.875rem', color: 'var(--muted)', fontWeight: 500 }}>
+          <Box style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center', gap: '1rem', alignItems: 'center' }} role="group" aria-labelledby="agent-mode-label">
+            <span id="agent-mode-label" style={{ fontSize: '0.875rem', color: 'var(--muted)', fontWeight: 500 }}>
               Agent Mode:
             </span>
             <Stack direction="row" gap="xs">
@@ -264,7 +419,7 @@ export default function Home() {
         )}
 
         {/* Example Query Chips */}
-        <div style={{ marginBottom: '1rem' }}>
+        <div style={{ marginBottom: '1rem' }} role="group" aria-label="Example queries">
           <Stack 
             direction="row" 
             gap="sm" 
@@ -296,49 +451,35 @@ export default function Home() {
         </div>
 
         {/* Query Input */}
-        <div style={{ maxWidth: '800px', margin: '0 auto 2rem' }}>
-          <Stack 
-            direction="row" 
-            gap="md" 
-            alignItems="flex-end"
+        <QueryRow>
+          <div>
+            <TextField
+              type="text"
+              placeholder="Ask me about transactions, spending, or transfers..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={isGenerating}
+              label="Banking query"
+              aria-describedby="query-help"
+            />
+            <span id="query-help" style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.25rem', display: 'block' }}>
+              Try asking about transactions, spending, or transfers
+            </span>
+          </div>
+          <Button
+            variant="primary"
+            onClick={() => handleSubmit()}
+            disabled={isGenerating || !query.trim()}
+            aria-label={isGenerating ? 'Generating UI' : 'Submit query'}
           >
-            <div style={{ flex: 1 }}>
-              <TextField
-                type="text"
-                placeholder="Ask me about transactions, spending, or transfers..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={isGenerating}
-                label="Banking query"
-                aria-describedby="query-help"
-              />
-            </div>
-            <Button
-              variant="primary"
-              onClick={() => handleSubmit()}
-              disabled={isGenerating || !query.trim()}
-              aria-label={isGenerating ? 'Generating UI' : 'Submit query'}
-            >
-              {isGenerating ? 'Generating...' : 'Submit'}
-            </Button>
-          </Stack>
-        </div>
+            {isGenerating ? 'Generating...' : 'Submit'}
+          </Button>
+        </QueryRow>
 
         {/* Surface Container */}
-        <main 
+        <SurfaceContainer
           aria-label="Generated UI content"
-          style={{
-            maxWidth: '800px',
-            margin: '0 auto',
-            background: 'var(--surface)',
-            borderRadius: '1rem',
-            padding: '2rem',
-            boxShadow: '0 4px 6px var(--shadow)',
-            border: '1px solid var(--border)',
-            minHeight: '400px',
-            transition: 'box-shadow 0.3s ease',
-          }}
         >
           {(isGenerating || hasGenerated) && (
             <StatusIndicator 
@@ -351,10 +492,10 @@ export default function Home() {
             </StatusIndicator>
           )}
           <A2UIErrorBoundary>
-            <A2UISurface surfaceId="main" />
+            <A2UISurface surfaceId="main" onAction={handleUserAction} />
           </A2UIErrorBoundary>
-        </main>
-      </Box>
+        </SurfaceContainer>
+      </PageContainer>
     </PageWrapper>
   );
 }
