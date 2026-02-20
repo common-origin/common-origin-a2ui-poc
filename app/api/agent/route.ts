@@ -244,6 +244,6 @@ export async function GET() {
     agent: 'gemini',
     model: MODEL_NAME,
     configured: isConfigured,
-    mode: process.env.NEXT_PUBLIC_AGENT_MODE || 'mock',
+    mode: process.env.NEXT_PUBLIC_AGENT_MODE || 'real',
   });
 }

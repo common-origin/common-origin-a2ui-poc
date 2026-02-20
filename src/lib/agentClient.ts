@@ -17,7 +17,7 @@ const log = createLogger('Agent');
 /**
  * Agent mode configuration
  */
-const AGENT_MODE = process.env.NEXT_PUBLIC_AGENT_MODE || 'mock';
+const AGENT_MODE = process.env.NEXT_PUBLIC_AGENT_MODE || 'real';
 
 /**
  * A single turn in a conversation
