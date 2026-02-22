@@ -450,7 +450,7 @@
         },
         "children": { "$ref": "#/$defs/childrenProperty" }
       },
-      "required": ["id", "component", "title"],
+      "required": ["id", "component"],
       "additionalProperties": false
     },
 

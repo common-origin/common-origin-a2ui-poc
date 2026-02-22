@@ -7,8 +7,9 @@
  * Also accepts legacy v0.8 message names for backward compatibility.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { renderNode, CATALOG_ID } from '../a2ui/catalog';\nimport { renderSkeleton } from '../a2ui/skeleton';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { renderNode, CATALOG_ID } from '../a2ui/catalog';
+import { renderSkeleton } from '../a2ui/skeleton';
 import { createLogger } from '../lib/logger';
 import { useSurfaceRegistration, useSurfaceDispatch } from './SurfaceContext';
 import type {
@@ -19,6 +20,18 @@ import type {
 } from '../a2ui/types';
 
 const log = createLogger('Surface');
+
+/**
+ * Surface transition phases (state machine):
+ *
+ *   idle ──[startTransition]──▸ exiting ──[timeout 300ms]──▸ loading ──[components arrive]──▸ entering ──[timeout 400ms]──▸ idle
+ *
+ * - idle:     Normal render of current content
+ * - exiting:  Old content fades/blurs out (300ms CSS transition)
+ * - loading:  Skeleton placeholder while agent generates
+ * - entering: New content fades in (400ms animation)
+ */
+type TransitionPhase = 'idle' | 'exiting' | 'loading' | 'entering';
 
 interface A2UISurfaceProps {
   surfaceId?: string;
@@ -45,7 +58,16 @@ export function A2UISurface({
     dataModel: new Map(),
     rendering: false,
   });
-  const [transitioning, setTransitioning] = useState(false);
+
+  // ── Transition state machine ──────────────────────────────────────────
+  const [phase, setPhase] = useState<TransitionPhase>('idle');
+  const prevContentRef = useRef<React.ReactNode>(null);
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const enterTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const surfaceRef = useRef(surface);
+  surfaceRef.current = surface;
+  const handleActionRef = useRef(handleAction);
+  handleActionRef.current = handleAction;
 
   /**
    * Handle actions from rendered components.
@@ -200,18 +222,58 @@ export function A2UISurface({
   }, [processMessage]);
 
   /**
-   * Expose transitioning state so parent can trigger it
+   * Begin the exit transition. Captures current rendered content and starts
+   * the exiting → loading → entering → idle sequence.
    */
   const startTransition = useCallback(() => {
-    setTransitioning(true);
-  }, []);
-
-  // Clear transition state when new components arrive
-  useEffect(() => {
-    if (surface.components.size > 0 && transitioning) {
-      setTransitioning(false);
+    // Only transition if we have content to transition away from
+    const snap = surfaceRef.current;
+    if (snap.rendering && snap.components.size > 0) {
+      const rootNode = snap.components.get(snap.root || 'root');
+      if (rootNode) {
+        prevContentRef.current = renderNode(rootNode, snap, handleActionRef.current);
+      }
     }
-  }, [surface.components.size, transitioning]);
+    setPhase('exiting');
+    // After exit animation completes, move to loading phase
+    clearTimeout(exitTimerRef.current);
+    exitTimerRef.current = setTimeout(() => {
+      setPhase('loading');
+    }, 300);
+  }, []); // stable — reads current values from refs
+
+  // When new components arrive during loading phase → transition to entering
+  useEffect(() => {
+    if (phase === 'loading' && surface.components.size > 0 && surface.components.has(surface.root || 'root')) {
+      prevContentRef.current = null;
+      setPhase('entering');
+      clearTimeout(enterTimerRef.current);
+      enterTimerRef.current = setTimeout(() => {
+        setPhase('idle');
+      }, 400);
+    }
+  }, [phase, surface.components, surface.root]);
+
+  // If components arrive while still in exiting phase, skip straight to entering
+  useEffect(() => {
+    if (phase === 'exiting' && surface.components.size > 0 && surface.components.has(surface.root || 'root')) {
+      clearTimeout(exitTimerRef.current);
+      prevContentRef.current = null;
+      setPhase('entering');
+      clearTimeout(enterTimerRef.current);
+      enterTimerRef.current = setTimeout(() => {
+        setPhase('idle');
+      }, 400);
+    }
+  }, [phase, surface.components, surface.root]);
+
+  // Cleanup timers
+  useEffect(() => {
+    return () => {
+      clearTimeout(exitTimerRef.current);
+      clearTimeout(enterTimerRef.current);
+    };
+  }, []);
 
   /**
    * Register this surface via React context (preferred) or window global (fallback)
@@ -237,9 +299,47 @@ export function A2UISurface({
   }, [surfaceId, processMessage, processMessages, startTransition, contextRegistration]);
 
   /**
-   * Render the surface
+   * Render the surface based on the current transition phase
    */
   const renderSurface = () => {
+    // ── Exiting phase: show previous content fading out ──
+    if (phase === 'exiting' && prevContentRef.current) {
+      return (
+        <div
+          className={className}
+          style={{
+            opacity: 0,
+            filter: 'blur(4px)',
+            transform: 'scale(0.98)',
+            transition: 'opacity 0.3s ease, filter 0.3s ease, transform 0.3s ease',
+            pointerEvents: 'none',
+          }}
+        >
+          {prevContentRef.current}
+        </div>
+      );
+    }
+
+    // ── Loading phase: show skeleton ──
+    if (phase === 'loading' || phase === 'exiting') {
+      return (
+        <div className={className} role="status" aria-label="Loading new content">
+          <div style={{
+            animation: 'fadeIn 0.2s ease',
+          }}>
+            <style>{`
+              @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+              }
+            `}</style>
+            {renderSkeleton('card', '100%', '20px', 3, 'transition-skeleton')}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Not yet rendering (initial state) ──
     if (!surface.rendering || !surface.root) {
       return (
         <div className={className} role="status" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted, #666)' }}>
@@ -259,21 +359,20 @@ export function A2UISurface({
       );
     }
 
+    // ── Entering phase: new content fades in ──
+    // ── Idle phase: normal render ──
     return (
       <div 
         className={className}
         style={{
-          animation: transitioning ? undefined : 'fadeInUp 0.4s ease-out',
-          opacity: transitioning ? 0.5 : 1,
-          filter: transitioning ? 'blur(2px)' : 'none',
-          transition: 'opacity 0.2s ease, filter 0.2s ease',
+          animation: phase === 'entering' ? 'fadeInUp 0.4s ease-out' : undefined,
         }}
       >
         <style>{`
           @keyframes fadeInUp {
             from {
               opacity: 0;
-              transform: translateY(20px);
+              transform: translateY(12px);
             }
             to {
               opacity: 1;
