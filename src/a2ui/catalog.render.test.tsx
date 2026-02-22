@@ -383,10 +383,10 @@ describe('Divider component rendering', () => {
   });
 });
 
-// ── Card (CardLarge) ──────────────────────────────────────────────────
+// ── Card ──────────────────────────────────────────────────────────────
 
 describe('Card component rendering', () => {
-  it('renders card with title and excerpt', () => {
+  it('renders card without children using CardLarge (title and excerpt)', () => {
     renderComponent({
       id: 'card-1',
       component: 'Card',
@@ -397,22 +397,38 @@ describe('Card component rendering', () => {
     expect(screen.getByText('Review your transfer details below')).toBeInTheDocument();
   });
 
-  it('renders card with subtitle and labels', () => {
-    renderComponent({
-      id: 'card-2',
-      component: 'Card',
-      title: 'Details',
-      excerpt: 'Some excerpt',
-      subtitle: 'Sub',
-      labels: ['urgent', 'new'],
-    });
-    expect(screen.getByText('Details')).toBeInTheDocument();
-    expect(screen.getByText('Some excerpt')).toBeInTheDocument();
+  it('renders card with children using Box container', () => {
+    renderComponent(
+      {
+        id: 'card-2',
+        component: 'Card',
+        variant: 'outlined',
+        children: ['card-child'],
+      },
+      [{ id: 'card-child', component: 'Text', text: 'Child content inside card' }]
+    );
+    // Children should now be rendered (Box supports children, CardLarge did not)
+    expect(screen.getByText('Child content inside card')).toBeInTheDocument();
+  });
+
+  it('renders card with children and title using Box', () => {
+    renderComponent(
+      {
+        id: 'card-3',
+        component: 'Card',
+        title: 'Summary',
+        variant: 'outlined',
+        children: ['card-text'],
+      },
+      [{ id: 'card-text', component: 'Text', text: 'Transfer details here' }]
+    );
+    expect(screen.getByText('Summary')).toBeInTheDocument();
+    expect(screen.getByText('Transfer details here')).toBeInTheDocument();
   });
 
   it('resolves title from data model', () => {
     renderComponent(
-      { id: 'card-3', component: 'Card', title: { path: '/card/title' }, excerpt: 'ok' },
+      { id: 'card-4', component: 'Card', title: { path: '/card/title' }, excerpt: 'ok' },
       [],
       { card: { title: 'Dynamic Card' } }
     );
@@ -432,6 +448,41 @@ describe('Progress component rendering', () => {
       variant: 'linear',
     });
     expect(container.textContent).toMatch(/Transfer progress/);
+  });
+});
+
+// ── CategoryBadge ─────────────────────────────────────────────────────
+
+describe('CategoryBadge component rendering', () => {
+  it('renders with label prop (primary)', () => {
+    renderComponent({
+      id: 'badge-1',
+      component: 'CategoryBadge',
+      label: 'Shopping',
+      color: 'blue',
+    });
+    expect(screen.getByText('Shopping')).toBeInTheDocument();
+  });
+
+  it('falls back to content prop (deprecated alias)', () => {
+    renderComponent({
+      id: 'badge-2',
+      component: 'CategoryBadge',
+      content: 'Groceries',
+      color: 'green',
+    });
+    expect(screen.getByText('Groceries')).toBeInTheDocument();
+  });
+
+  it('prefers label over content when both provided', () => {
+    renderComponent({
+      id: 'badge-3',
+      component: 'CategoryBadge',
+      label: 'Primary',
+      content: 'Fallback',
+      color: 'red',
+    });
+    expect(screen.getByText('Primary')).toBeInTheDocument();
   });
 });
 

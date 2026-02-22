@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { renderNode, CATALOG_ID } from '../a2ui/catalog';
+import { renderNode, CATALOG_ID } from '../a2ui/catalog';\nimport { renderSkeleton } from '../a2ui/skeleton';
 import { createLogger } from '../lib/logger';
 import { useSurfaceRegistration, useSurfaceDispatch } from './SurfaceContext';
 import type {
@@ -45,6 +45,7 @@ export function A2UISurface({
     dataModel: new Map(),
     rendering: false,
   });
+  const [transitioning, setTransitioning] = useState(false);
 
   /**
    * Handle actions from rendered components.
@@ -94,6 +95,9 @@ export function A2UISurface({
       if ('createSurface' in msg) {
         const { surfaceId: msgSurfaceId, catalogId } = msg.createSurface;
         if (msgSurfaceId !== surfaceId) return prev;
+        // Clear old state when a new surface is created (removes need for deleteSurface)
+        next.components = new Map();
+        next.dataModel = new Map();
         next.catalogId = catalogId;
         next.root = 'root'; // v0.9 convention: root component always has id "root"
         next.rendering = true;
@@ -196,10 +200,24 @@ export function A2UISurface({
   }, [processMessage]);
 
   /**
+   * Expose transitioning state so parent can trigger it
+   */
+  const startTransition = useCallback(() => {
+    setTransitioning(true);
+  }, []);
+
+  // Clear transition state when new components arrive
+  useEffect(() => {
+    if (surface.components.size > 0 && transitioning) {
+      setTransitioning(false);
+    }
+  }, [surface.components.size, transitioning]);
+
+  /**
    * Register this surface via React context (preferred) or window global (fallback)
    */
   useEffect(() => {
-    const handler = { processMessage, processMessages };
+    const handler = { processMessage, processMessages, startTransition };
 
     // Context-based registration (preferred)
     if (contextRegistration) {
@@ -216,7 +234,7 @@ export function A2UISurface({
         delete (window as any).__a2uiSurfaces[surfaceId];
       };
     }
-  }, [surfaceId, processMessage, processMessages, contextRegistration]);
+  }, [surfaceId, processMessage, processMessages, startTransition, contextRegistration]);
 
   /**
    * Render the surface
@@ -231,10 +249,12 @@ export function A2UISurface({
     }
 
     const rootNode = surface.components.get(surface.root);
+
+    // Surface is rendering but root component hasn't arrived yet — show skeleton
     if (!rootNode) {
       return (
-        <div className={className} role="status" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted, #666)' }}>
-          Root component not found: {surface.root}
+        <div className={className} role="status" aria-label="Loading">
+          {renderSkeleton('card', '100%', '20px', 3, 'loading-skeleton')}
         </div>
       );
     }
@@ -243,10 +263,13 @@ export function A2UISurface({
       <div 
         className={className}
         style={{
-          animation: 'fadeInUp 0.4s ease-out',
+          animation: transitioning ? undefined : 'fadeInUp 0.4s ease-out',
+          opacity: transitioning ? 0.5 : 1,
+          filter: transitioning ? 'blur(2px)' : 'none',
+          transition: 'opacity 0.2s ease, filter 0.2s ease',
         }}
       >
-        <style jsx>{`
+        <style>{`
           @keyframes fadeInUp {
             from {
               opacity: 0;

@@ -621,8 +621,8 @@
       "properties": {
         "id": true,
         "component": { "const": "CategoryBadge" },
-        "content": { "$ref": "#/$defs/stringOrPath", "description": "Badge text." },
-        "label": { "$ref": "#/$defs/stringOrPath", "description": "Alias for content." },
+        "label": { "$ref": "#/$defs/stringOrPath", "description": "Badge text (primary prop)." },
+        "content": { "$ref": "#/$defs/stringOrPath", "description": "Deprecated alias for label." },
         "color": {
           "type": "string",
           "enum": ["blue", "green", "red", "orange", "purple", "teal", "pink", "grey"]

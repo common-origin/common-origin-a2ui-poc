@@ -19,6 +19,7 @@ import {
   Chip,
   FilterChip,
   BooleanChip,
+  Box,
   CardLarge,
   List,
   ListItem,
@@ -492,24 +493,32 @@ export function renderNode(
       const title = resolveBinding(node.title as StringOrPath, dm);
       const excerpt = node.excerpt ? resolveBinding(node.excerpt as StringOrPath, dm) : '';
       const subtitle = node.subtitle ? resolveBinding(node.subtitle as StringOrPath, dm) : '';
-      // v0.9 Card with children support
+
+      // Card with children → use Box as a styled container
+      // CardLarge doesn't accept children, so we use Box with card-like styling
       if (childElements.length > 0) {
-        return React.createElement(CardLarge, {
+        const isOutlined = node.variant === 'outlined';
+        const isFilled = node.variant === 'filled';
+        const containerChildren = title
+          ? [React.createElement(Typography, { key: `${id}-title`, variant: 'h3' }, title), ...childElements]
+          : childElements;
+        return React.createElement(Box, {
           key: id,
-          title,
-          excerpt,
-          subtitle,
-          labels: node.labels as string[],
-          picture: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23e9ecef" width="100" height="100"/%3E%3C/svg%3E',
-        }, ...childElements);
+          p: 'lg' as any,
+          borderRadius: '4' as any,
+          border: isOutlined ? 'default' as any : undefined,
+          bg: isFilled ? 'subtle' as any : 'surface' as any,
+        }, ...containerChildren);
       }
+
+      // Card without children → use CardLarge (for media/summary cards)
       return React.createElement(CardLarge, {
         key: id,
-        title,
+        title: title || '',
         excerpt,
         subtitle,
         labels: node.labels as string[],
-        picture: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23e9ecef" width="100" height="100"/%3E%3C/svg%3E',
+        picture: node.picture as string || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23e9ecef" width="100" height="100"/%3E%3C/svg%3E',
       });
     }
 
@@ -645,7 +654,8 @@ export function renderNode(
     }
 
     case 'CategoryBadge': {
-      const text = resolveBinding((node.content || node.label) as StringOrPath, dm);
+      // Standardised on `label` — `content` kept as fallback for backward compat
+      const text = resolveBinding((node.label || node.content) as StringOrPath, dm);
       return React.createElement(CategoryBadge, {
         key: id,
         color: node.color || 'blue',
