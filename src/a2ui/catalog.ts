@@ -89,7 +89,7 @@ export function sanitizeUrl(url: unknown): string {
  *   - Path object:  { path: "/key" } → resolved from data model
  *   - Legacy literalString: { literalString: "Hello" } → still accepted for compat
  */
-function resolveBinding(
+export function resolveBinding(
   binding: StringOrPath | NumberOrPath | undefined,
   dataModel: Map<string, unknown>
 ): string {
@@ -120,7 +120,7 @@ function resolveBinding(
 }
 
 /** Resolve a numeric binding. */
-function resolveNumber(
+export function resolveNumber(
   binding: NumberOrPath | undefined,
   dataModel: Map<string, unknown>
 ): number {
@@ -136,7 +136,7 @@ function resolveNumber(
  * has an `action` with `name` + `context`, we resolve all context paths
  * from the local data model and produce a fully-resolved UserActionMessage.
  */
-function resolveAction(
+export function resolveAction(
   action: ActionDefinition,
   sourceComponentId: string,
   surfaceId: string,
@@ -171,7 +171,7 @@ function resolveAction(
  * Check if a value looks like a v0.9 spec ActionDefinition
  * (has `name` string property, distinguishing it from legacy eventType-based actions)
  */
-function isSpecAction(action: unknown): action is ActionDefinition {
+export function isSpecAction(action: unknown): action is ActionDefinition {
   return (
     action !== null &&
     typeof action === 'object' &&
