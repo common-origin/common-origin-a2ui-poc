@@ -507,7 +507,7 @@
         "currency": { "type": "string", "description": "ISO 4217 currency code." },
         "children": { "$ref": "#/$defs/childrenProperty" }
       },
-      "required": ["id", "component", "date", "children"],
+      "required": ["id", "component", "date"],
       "additionalProperties": false
     },
 

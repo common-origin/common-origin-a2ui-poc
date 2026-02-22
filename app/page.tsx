@@ -102,19 +102,7 @@ const StatusIndicator = styled.div<{ $isGenerating: boolean }>`
   font-size: 0.875rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  transition: all 0.3s ease;
-  animation: slideDown 0.3s ease;
-  
-  @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
+  transition: background 0.3s ease, color 0.3s ease;
   
   &::before {
     content: '';
@@ -123,6 +111,7 @@ const StatusIndicator = styled.div<{ $isGenerating: boolean }>`
     border-radius: 50%;
     background: ${props => props.$isGenerating ? 'var(--status-generating-dot)' : 'var(--status-done-dot)'};
     animation: ${props => props.$isGenerating ? 'pulse 1.5s ease-in-out infinite' : 'none'};
+    transition: background 0.3s ease;
   }
   
   @keyframes pulse {

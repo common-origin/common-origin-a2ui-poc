@@ -66,8 +66,7 @@ export function A2UISurface({
   const enterTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const surfaceRef = useRef(surface);
   surfaceRef.current = surface;
-  const handleActionRef = useRef(handleAction);
-  handleActionRef.current = handleAction;
+  const handleActionRef = useRef<(action: any) => void>(null!);
 
   /**
    * Handle actions from rendered components.
@@ -104,6 +103,7 @@ export function A2UISurface({
       onAction(action);
     }
   }, [onAction]);
+  handleActionRef.current = handleAction;
 
   /**
    * Process an A2UI message (v0.9 + v0.8 compat) and update surface state
@@ -299,80 +299,65 @@ export function A2UISurface({
   }, [surfaceId, processMessage, processMessages, startTransition, contextRegistration]);
 
   /**
-   * Render the surface based on the current transition phase
+   * Render the surface — single persistent wrapper div across all phases.
+   *
+   * IMPORTANT: We must return the SAME wrapper <div> in every branch so that
+   * React preserves the DOM element. This is what makes CSS transitions work —
+   * when phase changes from idle → exiting, the SAME element gets new style
+   * values and the browser can animate between them. If we returned different
+   * elements per branch, React would unmount/remount and cause a visible flash.
    */
   const renderSurface = () => {
-    // ── Exiting phase: show previous content fading out ──
-    if (phase === 'exiting' && prevContentRef.current) {
-      return (
-        <div
-          className={className}
-          style={{
-            opacity: 0,
-            filter: 'blur(4px)',
-            transform: 'scale(0.98)',
-            transition: 'opacity 0.3s ease, filter 0.3s ease, transform 0.3s ease',
-            pointerEvents: 'none',
-          }}
-        >
-          {prevContentRef.current}
-        </div>
-      );
-    }
+    const isExiting = phase === 'exiting';
+    const isLoading = phase === 'loading';
+    const isEntering = phase === 'entering';
 
-    // ── Loading phase: show skeleton ──
-    if (phase === 'loading' || phase === 'exiting') {
-      return (
-        <div className={className} role="status" aria-label="Loading new content">
-          <div style={{
-            animation: 'fadeIn 0.2s ease',
-          }}>
-            <style>{`
-              @keyframes fadeIn {
-                from { opacity: 0; }
-                to { opacity: 1; }
-              }
-            `}</style>
-            {renderSkeleton('card', '100%', '20px', 3, 'transition-skeleton')}
-          </div>
-        </div>
-      );
-    }
+    // ── Determine content based on phase ────────────────────────────────
+    let content: React.ReactNode;
 
-    // ── Not yet rendering (initial state) ──
-    if (!surface.rendering || !surface.root) {
-      return (
-        <div className={className} role="status" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted, #666)' }}>
+    if (isExiting) {
+      // During exit: show captured snapshot so content stays visually stable
+      // even as createSurface clears the live component map underneath
+      content = prevContentRef.current || renderSkeleton('card', '100%', '20px', 3, 'exit-skeleton');
+    } else if (isLoading) {
+      content = renderSkeleton('card', '100%', '20px', 3, 'transition-skeleton');
+    } else if (!surface.rendering || !surface.root) {
+      content = (
+        <div role="status" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted, #666)' }}>
           Waiting for UI generation...
         </div>
       );
+    } else {
+      const rootNode = surface.components.get(surface.root);
+      if (!rootNode) {
+        content = renderSkeleton('card', '100%', '20px', 3, 'loading-skeleton');
+      } else {
+        content = renderNode(rootNode, surface, handleAction);
+      }
     }
 
-    const rootNode = surface.components.get(surface.root);
-
-    // Surface is rendering but root component hasn't arrived yet — show skeleton
-    if (!rootNode) {
-      return (
-        <div className={className} role="status" aria-label="Loading">
-          {renderSkeleton('card', '100%', '20px', 3, 'loading-skeleton')}
-        </div>
-      );
-    }
-
-    // ── Entering phase: new content fades in ──
-    // ── Idle phase: normal render ──
+    // ── Single persistent wrapper — CSS transitions work across phases ──
     return (
-      <div 
+      <div
         className={className}
+        data-phase={phase}
+        role={isLoading ? 'status' : undefined}
+        aria-label={isLoading ? 'Loading new content' : undefined}
         style={{
-          animation: phase === 'entering' ? 'fadeInUp 0.4s ease-out' : undefined,
+          // Transition is ALWAYS present so the browser can animate between values
+          transition: 'opacity 0.3s ease-out, filter 0.3s ease-out, transform 0.3s ease-out',
+          opacity: isExiting ? 0 : 1,
+          filter: isExiting ? 'blur(4px)' : 'none',
+          transform: isExiting ? 'scale(0.98)' : 'none',
+          pointerEvents: isExiting || isLoading ? 'none' : undefined,
+          animation: isEntering ? 'surfaceEnter 0.35s ease-out' : undefined,
         }}
       >
         <style>{`
-          @keyframes fadeInUp {
+          @keyframes surfaceEnter {
             from {
-              opacity: 0;
-              transform: translateY(12px);
+              opacity: 0.2;
+              transform: translateY(8px);
             }
             to {
               opacity: 1;
@@ -380,7 +365,7 @@ export function A2UISurface({
             }
           }
         `}</style>
-        {renderNode(rootNode, surface, handleAction)}
+        {content}
       </div>
     );
   };
