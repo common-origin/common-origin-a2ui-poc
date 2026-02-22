@@ -5,33 +5,23 @@
  * 
  * Processes v0.9 messages: createSurface, updateComponents, updateDataModel, deleteSurface
  * Also accepts legacy v0.8 message names for backward compatibility.
+ *
+ * Follows the A2UI spec approach: surfaces are cleared and rebuilt.
+ * The parent page controls loading/generating state — the surface simply
+ * renders whatever components it currently has.
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { renderNode, CATALOG_ID } from '../a2ui/catalog';
-import { renderSkeleton } from '../a2ui/skeleton';
+import React, { useState, useCallback, useEffect } from 'react';
+import { renderNode } from '../a2ui/catalog';
 import { createLogger } from '../lib/logger';
 import { useSurfaceRegistration, useSurfaceDispatch } from './SurfaceContext';
 import type {
   A2UIMessage,
   SurfaceState,
-  ComponentNode,
   UserActionMessage,
 } from '../a2ui/types';
 
 const log = createLogger('Surface');
-
-/**
- * Surface transition phases (state machine):
- *
- *   idle ──[startTransition]──▸ exiting ──[timeout 300ms]──▸ loading ──[components arrive]──▸ entering ──[timeout 400ms]──▸ idle
- *
- * - idle:     Normal render of current content
- * - exiting:  Old content fades/blurs out (300ms CSS transition)
- * - loading:  Skeleton placeholder while agent generates
- * - entering: New content fades in (400ms animation)
- */
-type TransitionPhase = 'idle' | 'exiting' | 'loading' | 'entering';
 
 interface A2UISurfaceProps {
   surfaceId?: string;
@@ -58,15 +48,6 @@ export function A2UISurface({
     dataModel: new Map(),
     rendering: false,
   });
-
-  // ── Transition state machine ──────────────────────────────────────────
-  const [phase, setPhase] = useState<TransitionPhase>('idle');
-  const prevContentRef = useRef<React.ReactNode>(null);
-  const exitTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const enterTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const surfaceRef = useRef(surface);
-  surfaceRef.current = surface;
-  const handleActionRef = useRef<(action: any) => void>(null!);
 
   /**
    * Handle actions from rendered components.
@@ -103,7 +84,6 @@ export function A2UISurface({
       onAction(action);
     }
   }, [onAction]);
-  handleActionRef.current = handleAction;
 
   /**
    * Process an A2UI message (v0.9 + v0.8 compat) and update surface state
@@ -222,64 +202,10 @@ export function A2UISurface({
   }, [processMessage]);
 
   /**
-   * Begin the exit transition. Captures current rendered content and starts
-   * the exiting → loading → entering → idle sequence.
-   */
-  const startTransition = useCallback(() => {
-    // Only transition if we have content to transition away from
-    const snap = surfaceRef.current;
-    if (snap.rendering && snap.components.size > 0) {
-      const rootNode = snap.components.get(snap.root || 'root');
-      if (rootNode) {
-        prevContentRef.current = renderNode(rootNode, snap, handleActionRef.current);
-      }
-    }
-    setPhase('exiting');
-    // After exit animation completes, move to loading phase
-    clearTimeout(exitTimerRef.current);
-    exitTimerRef.current = setTimeout(() => {
-      setPhase('loading');
-    }, 300);
-  }, []); // stable — reads current values from refs
-
-  // When new components arrive during loading phase → transition to entering
-  useEffect(() => {
-    if (phase === 'loading' && surface.components.size > 0 && surface.components.has(surface.root || 'root')) {
-      prevContentRef.current = null;
-      setPhase('entering');
-      clearTimeout(enterTimerRef.current);
-      enterTimerRef.current = setTimeout(() => {
-        setPhase('idle');
-      }, 400);
-    }
-  }, [phase, surface.components, surface.root]);
-
-  // If components arrive while still in exiting phase, skip straight to entering
-  useEffect(() => {
-    if (phase === 'exiting' && surface.components.size > 0 && surface.components.has(surface.root || 'root')) {
-      clearTimeout(exitTimerRef.current);
-      prevContentRef.current = null;
-      setPhase('entering');
-      clearTimeout(enterTimerRef.current);
-      enterTimerRef.current = setTimeout(() => {
-        setPhase('idle');
-      }, 400);
-    }
-  }, [phase, surface.components, surface.root]);
-
-  // Cleanup timers
-  useEffect(() => {
-    return () => {
-      clearTimeout(exitTimerRef.current);
-      clearTimeout(enterTimerRef.current);
-    };
-  }, []);
-
-  /**
    * Register this surface via React context (preferred) or window global (fallback)
    */
   useEffect(() => {
-    const handler = { processMessage, processMessages, startTransition };
+    const handler = { processMessage, processMessages };
 
     // Context-based registration (preferred)
     if (contextRegistration) {
@@ -296,81 +222,37 @@ export function A2UISurface({
         delete (window as any).__a2uiSurfaces[surfaceId];
       };
     }
-  }, [surfaceId, processMessage, processMessages, startTransition, contextRegistration]);
+  }, [surfaceId, processMessage, processMessages, contextRegistration]);
 
   /**
-   * Render the surface — single persistent wrapper div across all phases.
+   * Render the surface.
    *
-   * IMPORTANT: We must return the SAME wrapper <div> in every branch so that
-   * React preserves the DOM element. This is what makes CSS transitions work —
-   * when phase changes from idle → exiting, the SAME element gets new style
-   * values and the browser can animate between them. If we returned different
-   * elements per branch, React would unmount/remount and cause a visible flash.
+   * Follows the A2UI spec approach: the surface simply renders whatever
+   * components it currently has. No transitions, no skeleton placeholders.
+   * The parent page controls loading/generating state via its own UI.
    */
-  const renderSurface = () => {
-    const isExiting = phase === 'exiting';
-    const isLoading = phase === 'loading';
-    const isEntering = phase === 'entering';
-
-    // ── Determine content based on phase ────────────────────────────────
-    let content: React.ReactNode;
-
-    if (isExiting) {
-      // During exit: show captured snapshot so content stays visually stable
-      // even as createSurface clears the live component map underneath
-      content = prevContentRef.current || renderSkeleton('card', '100%', '20px', 3, 'exit-skeleton');
-    } else if (isLoading) {
-      content = renderSkeleton('card', '100%', '20px', 3, 'transition-skeleton');
-    } else if (!surface.rendering || !surface.root) {
-      content = (
+  if (!surface.rendering || !surface.root) {
+    return (
+      <div className={className}>
         <div role="status" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted, #666)' }}>
           Waiting for UI generation...
         </div>
-      );
-    } else {
-      const rootNode = surface.components.get(surface.root);
-      if (!rootNode) {
-        content = renderSkeleton('card', '100%', '20px', 3, 'loading-skeleton');
-      } else {
-        content = renderNode(rootNode, surface, handleAction);
-      }
-    }
-
-    // ── Single persistent wrapper — CSS transitions work across phases ──
-    return (
-      <div
-        className={className}
-        data-phase={phase}
-        role={isLoading ? 'status' : undefined}
-        aria-label={isLoading ? 'Loading new content' : undefined}
-        style={{
-          // Transition is ALWAYS present so the browser can animate between values
-          transition: 'opacity 0.3s ease-out, filter 0.3s ease-out, transform 0.3s ease-out',
-          opacity: isExiting ? 0 : 1,
-          filter: isExiting ? 'blur(4px)' : 'none',
-          transform: isExiting ? 'scale(0.98)' : 'none',
-          pointerEvents: isExiting || isLoading ? 'none' : undefined,
-          animation: isEntering ? 'surfaceEnter 0.35s ease-out' : undefined,
-        }}
-      >
-        <style>{`
-          @keyframes surfaceEnter {
-            from {
-              opacity: 0.2;
-              transform: translateY(8px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-        `}</style>
-        {content}
       </div>
     );
-  };
+  }
 
-  return renderSurface();
+  const rootNode = surface.components.get(surface.root);
+  if (!rootNode) {
+    // createSurface received but updateComponents hasn't arrived yet — render nothing
+    // (the parent's StatusIndicator already shows "Agent streaming UI updates...")
+    return <div className={className} />;
+  }
+
+  return (
+    <div className={className}>
+      {renderNode(rootNode, surface, handleAction)}
+    </div>
+  );
 }
 
 /**

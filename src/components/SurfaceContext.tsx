@@ -22,7 +22,6 @@ import type { A2UIMessage } from '../a2ui/types';
 interface SurfaceHandler {
   processMessage: (message: A2UIMessage) => void;
   processMessages: (messages: A2UIMessage[]) => void;
-  startTransition?: () => void;
 }
 
 interface SurfaceRegistry {
@@ -30,7 +29,6 @@ interface SurfaceRegistry {
   unregister: (surfaceId: string) => void;
   dispatch: (surfaceId: string, message: A2UIMessage) => void;
   dispatchMany: (surfaceId: string, messages: A2UIMessage[]) => void;
-  triggerTransition: (surfaceId: string) => void;
 }
 
 // ── Context ───────────────────────────────────────────────────────────────
@@ -64,14 +62,7 @@ export function A2UISurfaceProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
-  const triggerTransition = useCallback((surfaceId: string) => {
-    const handler = handlers.current.get(surfaceId);
-    if (handler?.startTransition) {
-      handler.startTransition();
-    }
-  }, []);
-
-  const registry: SurfaceRegistry = { register, unregister, dispatch, dispatchMany, triggerTransition };
+  const registry: SurfaceRegistry = { register, unregister, dispatch, dispatchMany };
 
   return (
     <SurfaceContext.Provider value={registry}>
@@ -118,14 +109,5 @@ export function useSurfaceDispatch(surfaceId: string = 'main') {
     }
   }, [ctx, surfaceId]);
 
-  const startTransition = useCallback(() => {
-    if (ctx) {
-      ctx.triggerTransition(surfaceId);
-    } else if (typeof window !== 'undefined') {
-      const surfaces = (window as any).__a2uiSurfaces;
-      surfaces?.[surfaceId]?.startTransition?.();
-    }
-  }, [ctx, surfaceId]);
-
-  return { sendMessage, sendMessages, startTransition };
+  return { sendMessage, sendMessages };
 }

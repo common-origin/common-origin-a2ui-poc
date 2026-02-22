@@ -134,7 +134,7 @@ export default function Home() {
   const [agentMode, setAgentMode] = useState<'mock' | 'real'>(getAgentMode());
   const [realAgentAvailable, setRealAgentAvailable] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<ConversationTurn[]>([]);
-  const { sendMessage, startTransition } = useA2UISurface('main');
+  const { sendMessage } = useA2UISurface('main');
 
   // Check if real agent is available on mount
   useEffect(() => {
@@ -149,9 +149,6 @@ export default function Home() {
     setHasGenerated(false);
     setError(null);
     setQuery('');
-
-    // Dim/blur existing UI instead of clearing it (prevents blank flash)
-    startTransition();
 
     // Analyze query and get scenario hint
     const analysis = analyzeQuery(queryToProcess);
@@ -265,9 +262,6 @@ export default function Home() {
     setIsGenerating(true);
     setError(null);
 
-    // Dim/blur existing UI instead of clearing it (prevents blank flash)
-    startTransition();
-
     // Add the user action as a conversation turn
     const updatedHistory: ConversationTurn[] = [
       ...conversationHistory,
@@ -325,7 +319,7 @@ export default function Home() {
 
     setIsGenerating(false);
     setHasGenerated(true);
-  }, [agentMode, conversationHistory, sendMessage, startTransition]);
+  }, [agentMode, conversationHistory, sendMessage]);
 
   const handleExampleClick = (example: string) => {
     setQuery(example);
