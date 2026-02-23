@@ -249,6 +249,21 @@ describe('TextField component rendering', () => {
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(onAction.mock.calls[0][0].value).toBe('Rent payment');
   });
+
+  it('supports boolean path binding for Checkbox checked state', () => {
+    renderComponent(
+      {
+        id: 'cb-1',
+        component: 'Checkbox',
+        label: 'Money out',
+        checked: { path: '/filters/moneyOut' },
+      },
+      [],
+      { filters: { moneyOut: true } }
+    );
+
+    expect(screen.getByLabelText('Money out')).toBeChecked();
+  });
 });
 
 // ── MoneyDisplay ──────────────────────────────────────────────────────
@@ -336,6 +351,43 @@ describe('StatusBadge component rendering', () => {
   });
 });
 
+// ── AccountCard ──────────────────────────────────────────────────────
+
+describe('AccountCard component rendering', () => {
+  it('fires v0.9 spec action on card click', () => {
+    const onAction = vi.fn();
+    const { container } = renderComponent(
+      {
+        id: 'acc-1',
+        component: 'AccountCard',
+        accountName: { path: '/account/name' },
+        accountNumber: '7890',
+        balance: 3247.85,
+        currency: 'AUD',
+        accountType: 'everyday',
+        onClick: {
+          name: 'view_account_detail',
+          context: [
+            { key: 'accountName', value: { path: '/account/name' } },
+            { key: 'accountNumber', value: '7890' },
+          ],
+        },
+      },
+      [],
+      { account: { name: 'Everyday Account' } },
+      onAction
+    );
+
+    fireEvent.click(container.firstChild as Element);
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    const action = onAction.mock.calls[0][0];
+    expect(action.userAction.name).toBe('view_account_detail');
+    expect(action.userAction.context.accountName).toBe('Everyday Account');
+    expect(action.userAction.context.accountNumber).toBe('7890');
+  });
+});
+
 // ── Select (Dropdown) ─────────────────────────────────────────────────
 
 describe('Select component rendering', () => {
@@ -351,6 +403,206 @@ describe('Select component rendering', () => {
       ],
     });
     expect(screen.getByText('From Account')).toBeInTheDocument();
+  });
+
+  it('dispatches onChange action for string payload and normalizes dataPath', () => {
+    const onAction = vi.fn();
+    const node: ComponentNode = {
+      id: 'select-2',
+      component: 'Select',
+      label: 'To Account',
+      value: '',
+      options: [
+        { value: 'everyday', label: 'Everyday Account' },
+        { value: 'savings', label: 'Savings Account' },
+      ],
+      onChange: { eventType: 'change', dataPath: '/toAccount' },
+    };
+
+    const surface = makeSurface([node]);
+    const element = renderNode(node, surface, onAction) as any;
+
+    element.props.onChange('savings');
+
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'change',
+        value: 'savings',
+        updateDataModel: { toAccount: 'savings' },
+      })
+    );
+  });
+
+  it('dispatches onChange action for object payload from dropdown', () => {
+    const onAction = vi.fn();
+    const node: ComponentNode = {
+      id: 'select-3',
+      component: 'Select',
+      label: 'From Account',
+      value: '',
+      options: [
+        { value: 'everyday', label: 'Everyday Account' },
+        { value: 'offset', label: 'Offset Account' },
+      ],
+      onChange: { eventType: 'change', dataPath: 'fromAccount' },
+    };
+
+    const surface = makeSurface([node]);
+    const element = renderNode(node, surface, onAction) as any;
+
+    element.props.onChange({ value: 'offset', label: 'Offset Account' });
+
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'change',
+        value: 'offset',
+        updateDataModel: { fromAccount: 'offset' },
+      })
+    );
+  });
+});
+
+// ── SearchField ─────────────────────────────────────────────────────
+
+describe('SearchField component rendering', () => {
+  it('dispatches onChange action for string payload', () => {
+    const onAction = vi.fn();
+    const node: ComponentNode = {
+      id: 'search-1',
+      component: 'SearchField',
+      value: { path: '/query' },
+      onChange: { eventType: 'change', dataPath: '/query' },
+      placeholder: 'Search...',
+    };
+
+    const surface = makeSurface([node], { query: '' });
+    const element = renderNode(node, surface, onAction) as any;
+
+    element.props.onChange('woolworths');
+
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'change',
+        value: 'woolworths',
+        updateDataModel: { query: 'woolworths' },
+      })
+    );
+  });
+
+  it('dispatches onChange action for event-like payload', () => {
+    const onAction = vi.fn();
+    const node: ComponentNode = {
+      id: 'search-2',
+      component: 'SearchField',
+      value: { path: '/query' },
+      onChange: { eventType: 'change', dataPath: 'query' },
+      placeholder: 'Search...',
+    };
+
+    const surface = makeSurface([node], { query: '' });
+    const element = renderNode(node, surface, onAction) as any;
+
+    element.props.onChange({ target: { value: 'netflix' } });
+
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'change',
+        value: 'netflix',
+        updateDataModel: { query: 'netflix' },
+      })
+    );
+  });
+});
+
+// ── BooleanChip ──────────────────────────────────────────────────────
+
+describe('BooleanChip component rendering', () => {
+  it('uses boolean path binding for selected state', () => {
+    const { container } = renderComponent(
+      {
+        id: 'chip-1',
+        component: 'BooleanChip',
+        content: 'Last 30 days',
+        selected: { path: '/filters/last30Days' },
+      },
+      [],
+      { filters: { last30Days: true } }
+    );
+
+    expect(container.textContent).toMatch(/Last 30 days/);
+  });
+
+  it('fires local onClick update with toggled value', () => {
+    const onAction = vi.fn();
+    const node: ComponentNode = {
+      id: 'chip-2',
+      component: 'BooleanChip',
+      content: 'Money out',
+      selected: { path: '/filters/moneyOut' },
+      onClick: { eventType: 'change', dataPath: 'filters.moneyOut' },
+    };
+
+    const surface = makeSurface([node], { filters: { moneyOut: true } });
+    const element = renderNode(node, surface, onAction) as any;
+
+    element.props.onClick();
+
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'change',
+        value: false,
+        updateDataModel: { filters: { moneyOut: false } },
+      })
+    );
+  });
+});
+
+// ── TransactionListItem filtering ────────────────────────────────────
+
+describe('TransactionListItem local filtering', () => {
+  it('hides transactions that do not match query', () => {
+    const node: ComponentNode = {
+      id: 'tx-q1',
+      component: 'TransactionListItem',
+      merchant: 'Woolworths Metro CBD',
+      amount: -87.43,
+      date: '2026-02-17',
+      status: 'completed',
+      category: 'shopping',
+    };
+
+    const surface = makeSurface([node], { query: 'netflix' });
+    expect(renderNode(node, surface, vi.fn())).toBeNull();
+  });
+
+  it('shows only money-out transactions when filter is enabled', () => {
+    const node: ComponentNode = {
+      id: 'tx-q2',
+      component: 'TransactionListItem',
+      merchant: 'Salary Payment',
+      amount: 1200,
+      date: '2026-02-17',
+      status: 'completed',
+      category: 'other',
+    };
+
+    const surface = makeSurface([node], { filters: { moneyOut: true } });
+    expect(renderNode(node, surface, vi.fn())).toBeNull();
+  });
+
+  it('hides transactions outside selected last7Days range', () => {
+    const node: ComponentNode = {
+      id: 'tx-q3',
+      component: 'TransactionListItem',
+      merchant: 'Older Transaction',
+      amount: -19.5,
+      date: '2025-12-01',
+      status: 'completed',
+      category: 'shopping',
+    };
+
+    const surface = makeSurface([node], { filters: { last7Days: true } });
+    expect(renderNode(node, surface, vi.fn())).toBeNull();
   });
 });
 
@@ -434,6 +686,17 @@ describe('Card component rendering', () => {
     );
     expect(screen.getByText('Dynamic Card')).toBeInTheDocument();
   });
+
+  it('accepts explicit image prop without placeholder fallback', () => {
+    renderComponent({
+      id: 'card-5',
+      component: 'Card',
+      title: 'Card with image',
+      excerpt: 'Includes explicit image',
+      image: 'https://cdn.example.com/card.jpg',
+    });
+    expect(screen.getByText('Card with image')).toBeInTheDocument();
+  });
 });
 
 // ── Progress ──────────────────────────────────────────────────────────
@@ -464,25 +727,16 @@ describe('CategoryBadge component rendering', () => {
     expect(screen.getByText('Shopping')).toBeInTheDocument();
   });
 
-  it('falls back to content prop (deprecated alias)', () => {
+  it('resolves label from data model', () => {
     renderComponent({
       id: 'badge-2',
       component: 'CategoryBadge',
-      content: 'Groceries',
+      label: { path: '/category/name' },
       color: 'green',
+    }, [], {
+      category: { name: 'Groceries' },
     });
     expect(screen.getByText('Groceries')).toBeInTheDocument();
-  });
-
-  it('prefers label over content when both provided', () => {
-    renderComponent({
-      id: 'badge-3',
-      component: 'CategoryBadge',
-      label: 'Primary',
-      content: 'Fallback',
-      color: 'red',
-    });
-    expect(screen.getByText('Primary')).toBeInTheDocument();
   });
 });
 

@@ -60,7 +60,8 @@ String props can be:
 
 # ACTIONS (v0.9 spec)
 
-Buttons and interactive components use an "action" property with a "name" and optional "context".
+Buttons use an "action" property with a "name" and optional "context".
+List-style interactive components (for example TransactionListItem, ListItem) use "onClick" with the same v0.9 shape.
 Context items specify data to send back when the action fires. Use {"path":"/key"} to include the current value from the data model.
 
 Example — a transfer confirmation button:

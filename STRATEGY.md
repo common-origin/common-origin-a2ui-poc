@@ -2,6 +2,13 @@
 
 > **Context**: This plan was developed by Ollie Macky (Principal Designer, Elevate Design System, NAB Melbourne) to demonstrate the strategic value of design system patterns for agentic banking experiences. The demo targets the Elevate design system team, design system leadership, and product leadership at NAB.
 
+## Phase 3 Progress Snapshot (23 Feb 2026)
+
+- Status: **In progress**
+- Completed: Card image handling fix, action-format normalisation, CategoryBadge `label` standardisation, action follow-up loading state, page layout polish, targeted tests.
+- Deferred by decision: `A2UISurface` transition/skeleton/fade enhancements.
+- Remaining close-out: real Gemini walkthrough documentation + checklist sign-off + short reference recording.
+
 ## Strategic Vision
 
 The future of banking UX is agent-driven: users interact with AI agents via voice and text, and the agent renders UI using **design system patterns** — not freeform HTML. The design system becomes the **governance layer** for AI-generated experiences, ensuring consistency, accessibility, and quality regardless of what the agent decides to show.
@@ -81,6 +88,16 @@ This demo proves that thesis. It shows:
 ### Phase 3: Fund Transfer Flow Polish (Demo-Ready)
 **Goal**: One perfect flow that proves the value of well-defined patterns. This becomes the quality reference for all other flows.
 
+**Implementation Status (23 Feb 2026)**:
+- ✅ Completed: Card placeholder image fix, action format normalisation, CategoryBadge standardised to `label`, loading state during action follow-ups, page layout polish, and tests for these fixes.
+- ⏸️ Deferred by decision: surface transition enhancements in `A2UISurface.tsx` (blank-flash transition, skeleton transition state, fade-in transition).
+- ✅ Phase 3 closed for current scope after successful Fund Transfer walkthrough and sign-off.
+
+**Phase 3 Exit Criteria**:
+- [x] Record one full real-Gemini Fund Transfer walkthrough (form → review → confirm → success), including rendering issues, interaction bugs, and UX gaps.
+- [x] Update `docs/quality-checklist.md` with walkthrough outcomes and mark Fund Transfer as complete only when all non-deferred criteria are met.
+- [x] Capture a short screen recording reference for the polished Fund Transfer flow.
+
 **Steps**:
 1. Walk through the full Fund Transfer flow (form → review → confirm → success) with the real Gemini agent. Document every rendering issue, interaction bug, and UX gap
 2. **Fix blank flash between interactions** — Add a transition state in `A2UISurface.tsx`: hold previous surface briefly with fade-out, show skeleton loading, fade in new surface
@@ -94,19 +111,29 @@ This demo proves that thesis. It shows:
 
 **Outcome**: Fund Transfer flow is smooth, predictable, and visually polished. Quality standard is documented.
 
+**Note**: Broader render-latency/performance optimisation is intentionally scheduled for **Phase 6.5** after pattern formalisation.
+
 ---
 
 ### Phase 4: Apply Quality Standard to Remaining Flows
 **Goal**: All 6 demo flows meet the quality bar established by Fund Transfer.
 
+**Implementation Status (23 Feb 2026)**:
+- ✅ Completed: Account Overview, Transaction Search, Spending Summary, Bill Payment, and Card Management flow passes.
+- ✅ Added targeted regression coverage for prompt consistency and renderer interaction bindings used across these flows.
+- ✅ Phase 4 closed for current scope.
+
 **Steps**:
 1. Walk through each remaining flow (account overview, transaction search, spending summary, bill payment, card management) against the quality checklist
 2. Fix rendering issues found in each flow
-3. Write tests for each fix
+3. Write tests for each fix, including form-control action wiring regression tests (Select/TextField/NumberField/Checkbox update behavior, object-or-string select payload handling, and `dataPath` normalization)
 4. Ensure consistent Australian banking data across all responses (Sarah Chen persona, Melbourne, AUD)
 5. Add cancel/back navigation between screens where relevant
 
 **Outcome**: All 6 demo flows are demo-ready. The complete demo script from `DEMO.md` runs smoothly.
+
+**Note**: During Phase 4, prioritise correctness/quality consistency; defer pipeline-level latency tuning to **Phase 6.5**.
+**Note**: Transaction-search chip behaviour is functionally wired, but its visible impact is currently limited by the small/low-variance transaction sample set. Expand seeded transaction data (older dates, more credits/debits, broader categories) in a later pass to make filtering interactions more demonstrable.
 
 ---
 
@@ -142,6 +169,23 @@ This demo proves that thesis. It shows:
 6. Write tests for pattern validation
 
 **Outcome**: Patterns are first-class citizens in the design system. Agents reference patterns by name and the system validates compliance.
+
+---
+
+### Phase 6.5: Performance & Render Latency Optimisation (Post-Pattern Layer)
+**Goal**: Reduce time-to-first-render and time-to-interactive while preserving the A2UI protocol and pattern governance model.
+
+**Steps**:
+1. Add latency instrumentation across the full pipeline: submit → API start → model first byte → first valid A2UI message → first meaningful render
+2. Reduce runtime prompt weight by replacing verbose inline examples with compact pattern references established in Phase 6
+3. Limit conversation history sent per turn to only recent/relevant turns (sliding window)
+4. Introduce shell-first streaming guidance: agent sends minimal `createSurface` + lightweight initial components first, then detail batches
+5. Reduce render churn in the client by batching/coalescing rapid `updateComponents` bursts where possible
+6. Keep strict validation in development; use a lightweight production fast-path validation for streaming hot path if safe
+7. For mock mode, gate artificial delays behind a demo timing flag so performance testing can run without simulated wait
+8. Add regression tests/benchmarks for form interactivity latency and first-render timing targets
+
+**Outcome**: UI feels immediate while still fully A2UI-compliant. Performance improvements are measurable and repeatable.
 
 ---
 
@@ -224,5 +268,6 @@ When a gap is identified between what the demo needs and what Common Origin prov
 - **Phase 4**: All 6 demo flows pass the quality checklist
 - **Phase 5**: Voice input works in Chrome with 10+ common banking queries
 - **Phase 6**: Patterns are defined, agent references them, output is more consistent than inline examples
+- **Phase 6.5**: Latency metrics are captured, first render time is reduced, and shell-first streaming performs within defined targets
 - **Phase 7**: Toggling preferences visibly changes the rendered UI during a demo flow
 - **Phase 8**: Pattern analytics dashboard shows real interaction data

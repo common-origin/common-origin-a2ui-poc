@@ -130,6 +130,141 @@ export function resolveNumber(
   return parseFloat(resolveBinding(binding, dataModel)) || 0;
 }
 
+export function resolveBoolean(
+  binding: boolean | StringOrPath | undefined,
+  dataModel: Map<string, unknown>
+): boolean {
+  if (binding === undefined || binding === null) return false;
+  if (typeof binding === 'boolean') return binding;
+
+  const raw = resolveBinding(binding, dataModel).trim().toLowerCase();
+  if (raw === 'true' || raw === '1' || raw === 'yes') return true;
+  if (raw === 'false' || raw === '0' || raw === 'no' || raw === '') return false;
+
+  return Boolean(raw);
+}
+
+function normalizeDataPath(dataPath?: string): string | undefined {
+  if (!dataPath) return undefined;
+  return (dataPath.startsWith('/') ? dataPath.slice(1) : dataPath).replace(/\//g, '.');
+}
+
+function setNestedValue(target: Record<string, unknown>, pathSegments: string[], value: unknown): Record<string, unknown> {
+  if (pathSegments.length === 0) return target;
+
+  const [head, ...tail] = pathSegments;
+  if (!head) return target;
+
+  if (tail.length === 0) {
+    return { ...target, [head]: value };
+  }
+
+  const next = target[head];
+  const nextObj = next && typeof next === 'object' && !Array.isArray(next)
+    ? (next as Record<string, unknown>)
+    : {};
+
+  return {
+    ...target,
+    [head]: setNestedValue(nextObj, tail, value),
+  };
+}
+
+function toDataModelUpdate(
+  dataPath: string | undefined,
+  value: unknown,
+  dataModel: Map<string, unknown>
+): Record<string, unknown> | undefined {
+  const key = normalizeDataPath(dataPath);
+  if (!key) return undefined;
+
+  const segments = key.split('.').filter(Boolean);
+  if (segments.length === 0) return undefined;
+
+  if (segments.length === 1) {
+    return { [segments[0]]: value };
+  }
+
+  const [root, ...tail] = segments;
+  const existingRoot = dataModel.get(root);
+  const baseRoot = existingRoot && typeof existingRoot === 'object' && !Array.isArray(existingRoot)
+    ? (existingRoot as Record<string, unknown>)
+    : {};
+
+  return {
+    [root]: setNestedValue(baseRoot, tail, value),
+  };
+}
+
+function resolveSelectValue(selected: unknown): string {
+  if (typeof selected === 'string') return selected;
+  if (typeof selected === 'number' || typeof selected === 'boolean') return String(selected);
+  if (selected && typeof selected === 'object') {
+    const obj = selected as Record<string, unknown>;
+    if (typeof obj.value === 'string' || typeof obj.value === 'number' || typeof obj.value === 'boolean') {
+      return String(obj.value);
+    }
+    if (typeof obj.id === 'string' || typeof obj.id === 'number' || typeof obj.id === 'boolean') {
+      return String(obj.id);
+    }
+  }
+  return '';
+}
+
+function resolveSearchValue(nextValue: unknown): string {
+  if (typeof nextValue === 'string') return nextValue;
+  if (nextValue && typeof nextValue === 'object') {
+    const candidate = nextValue as Record<string, unknown>;
+    if (typeof candidate.value === 'string') return candidate.value;
+    const target = candidate.target;
+    if (target && typeof target === 'object' && typeof (target as Record<string, unknown>).value === 'string') {
+      return (target as Record<string, unknown>).value as string;
+    }
+  }
+  return '';
+}
+
+function isTransactionVisible(node: ComponentNode, dataModel: Map<string, unknown>): boolean {
+  const query = String(dataModel.get('query') ?? '').trim().toLowerCase();
+  const amount = resolveNumber(node.amount as NumberOrPath, dataModel);
+  const merchant = resolveBinding(node.merchant as StringOrPath, dataModel).toLowerCase();
+  const category = String(node.category ?? '').toLowerCase();
+  const date = resolveBinding(node.date as StringOrPath, dataModel).toLowerCase();
+
+  if (query) {
+    const amountText = Number.isFinite(amount) ? amount.toFixed(2) : '';
+    const matches = merchant.includes(query) || category.includes(query) || date.includes(query) || amountText.includes(query);
+    if (!matches) return false;
+  }
+
+  const filters = dataModel.get('filters');
+  const filterObj = filters && typeof filters === 'object' && !Array.isArray(filters)
+    ? (filters as Record<string, unknown>)
+    : undefined;
+
+  if (filterObj) {
+    const moneyOut = Boolean(filterObj.moneyOut);
+    const moneyIn = Boolean(filterObj.moneyIn);
+    const last7Days = Boolean(filterObj.last7Days);
+    const last30Days = Boolean(filterObj.last30Days);
+
+    if (last7Days || last30Days) {
+      const txDate = new Date(resolveBinding(node.date as StringOrPath, dataModel));
+      if (!Number.isNaN(txDate.getTime())) {
+        const now = new Date();
+        const diffDays = (now.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24);
+        const maxDays = last7Days ? 7 : 30;
+        if (diffDays > maxDays) return false;
+      }
+    }
+
+    if (moneyOut && amount >= 0) return false;
+    if (moneyIn && amount <= 0) return false;
+  }
+
+  return true;
+}
+
 /**
  * Resolve a v0.9 spec ActionDefinition into a UserActionMessage.
  *
@@ -290,7 +425,7 @@ export function renderNode(
           onAction?.({
             ...onChange,
             value: e.target.value,
-            updateDataModel: onChange.dataPath ? { [onChange.dataPath]: e.target.value } : undefined,
+            updateDataModel: toDataModelUpdate(onChange.dataPath, e.target.value, dm),
           });
         };
       } else if (valueText !== undefined) {
@@ -306,11 +441,12 @@ export function renderNode(
       return React.createElement(SearchField, {
         key: id,
         value,
-        onChange: (newValue: string) => {
+        onChange: (nextValue: unknown) => {
+          const resolvedValue = resolveSearchValue(nextValue);
           onAction?.({
             ...onChange,
-            value: newValue,
-            updateDataModel: onChange?.dataPath ? { [onChange.dataPath]: newValue } : undefined,
+            value: resolvedValue,
+            updateDataModel: toDataModelUpdate(onChange?.dataPath, resolvedValue, dm),
           });
         },
         suggestions: node.suggestions as any,
@@ -346,11 +482,12 @@ export function renderNode(
 
       if (onChange) {
         fieldProps.value = valueText !== undefined ? Number(valueText) : undefined;
-        fieldProps.onChange = (newValue: number) => {
+        fieldProps.onChange = (newValue: number | '') => {
+          const resolvedValue = newValue === '' ? 0 : newValue;
           onAction?.({
             ...onChange,
-            value: newValue,
-            updateDataModel: onChange.dataPath ? { [onChange.dataPath]: newValue } : undefined,
+            value: resolvedValue,
+            updateDataModel: toDataModelUpdate(onChange.dataPath, resolvedValue),
           });
         };
       } else if (valueText !== undefined) {
@@ -377,11 +514,12 @@ export function renderNode(
         options,
         placeholder: (node.placeholder as string) || 'Select...',
         disabled: node.disabled || false,
-        onChange: onChange ? (selectedValue: string) => {
+        onChange: onChange ? (selectedValue: unknown) => {
+          const resolvedValue = resolveSelectValue(selectedValue);
           onAction?.({
             ...onChange,
-            value: selectedValue,
-            updateDataModel: onChange.dataPath ? { [onChange.dataPath]: selectedValue } : undefined,
+            value: resolvedValue,
+            updateDataModel: toDataModelUpdate(onChange.dataPath, resolvedValue, dm),
           });
         } : () => {},
       });
@@ -390,17 +528,18 @@ export function renderNode(
     case 'Checkbox': {
       const label = resolveBinding(node.label as StringOrPath, dm);
       const onChange = node.onChange as any;
+      const checked = resolveBoolean(node.checked as boolean | StringOrPath | undefined, dm);
       return React.createElement(Checkbox, {
         key: id,
         label,
-        checked: node.checked || false,
+        checked,
         disabled: node.disabled || false,
         onChange: onChange ? (event: React.ChangeEvent<HTMLInputElement>) => {
           const isChecked = event.target.checked;
           onAction?.({
             ...onChange,
             value: isChecked,
-            updateDataModel: onChange.dataPath ? { [onChange.dataPath]: isChecked } : undefined,
+            updateDataModel: toDataModelUpdate(onChange.dataPath, isChecked, dm),
           });
         } : undefined,
       });
@@ -455,14 +594,15 @@ export function renderNode(
     case 'BooleanChip': {
       const text = resolveBinding(node.content as StringOrPath, dm);
       const onClick = node.onClick as any;
+      const selected = resolveBoolean(node.selected as boolean | StringOrPath | undefined, dm);
       return React.createElement(BooleanChip, {
         key: id,
-        selected: node.selected || false,
+        selected,
         onClick: onClick ? () => {
           onAction?.({
             ...onClick,
-            value: !node.selected,
-            updateDataModel: onClick.dataPath ? { [onClick.dataPath]: !node.selected } : undefined,
+            value: !selected,
+            updateDataModel: toDataModelUpdate(onClick.dataPath, !selected, dm),
           });
         } : () => {},
       }, text);
@@ -481,7 +621,7 @@ export function renderNode(
           onAction?.({
             ...onTabChange,
             value: tabId,
-            updateDataModel: onTabChange?.dataPath ? { [onTabChange.dataPath]: tabId } : undefined,
+            updateDataModel: toDataModelUpdate(onTabChange?.dataPath, tabId, dm),
           });
         },
         variant: node.variant || 'default',
@@ -512,14 +652,21 @@ export function renderNode(
       }
 
       // Card without children → use CardLarge (for media/summary cards)
-      return React.createElement(CardLarge, {
+      const cardProps: Record<string, unknown> = {
         key: id,
         title: title || '',
         excerpt,
         subtitle,
         labels: node.labels as string[],
-        picture: node.picture as string || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23e9ecef" width="100" height="100"/%3E%3C/svg%3E',
-      });
+      };
+
+      const image = node.image ? resolveBinding(node.image as StringOrPath, dm) : '';
+      const sanitizedImage = image ? sanitizeUrl(image) : '';
+      if (sanitizedImage) {
+        cardProps.picture = sanitizedImage;
+      }
+
+      return React.createElement(CardLarge, cardProps);
     }
 
     case 'List': {
@@ -551,10 +698,28 @@ export function renderNode(
 
     case 'DateGroup': {
       const dateValue = resolveBinding(node.date as StringOrPath, dm);
-      const totalAmount = node.totalAmount !== undefined ? resolveNumber(node.totalAmount as NumberOrPath, dm) : undefined;
-      const count = node.count !== undefined
-        ? (typeof node.count === 'number' ? node.count : parseInt(resolveBinding(node.count as StringOrPath, dm)))
-        : undefined;
+      const visibleTxNodes = (childIds as string[])
+        .map((childId) => surface.components.get(childId))
+        .filter((child): child is ComponentNode => Boolean(child) && child.component === 'TransactionListItem')
+        .filter((child) => isTransactionVisible(child, dm));
+
+      const hasTransactionChildren = visibleTxNodes.length > 0;
+      const totalAmount = hasTransactionChildren
+        ? visibleTxNodes.reduce((sum, tx) => sum + resolveNumber(tx.amount as NumberOrPath, dm), 0)
+        : node.totalAmount !== undefined
+          ? resolveNumber(node.totalAmount as NumberOrPath, dm)
+          : undefined;
+
+      const count = hasTransactionChildren
+        ? visibleTxNodes.length
+        : node.count !== undefined
+          ? (typeof node.count === 'number' ? node.count : parseInt(resolveBinding(node.count as StringOrPath, dm)))
+          : undefined;
+
+      if ((childIds as string[]).length > 0 && childElements.length === 0) {
+        return null;
+      }
+
       return React.createElement(DateGroup, {
         key: id,
         date: dateValue,
@@ -586,6 +751,10 @@ export function renderNode(
     }
 
     case 'TransactionListItem': {
+      if (!isTransactionVisible(node, dm)) {
+        return null;
+      }
+
       const merchant = resolveBinding(node.merchant as StringOrPath, dm);
       const amount = resolveNumber(node.amount as NumberOrPath, dm);
       const date = resolveBinding(node.date as StringOrPath, dm);
@@ -628,6 +797,18 @@ export function renderNode(
       const trendValue = node.trendValue ? resolveBinding(node.trendValue as StringOrPath, dm) : undefined;
       const action = node.action as any;
       const secondaryAction = node.secondaryAction as any;
+
+      const onClick = node.onClick as any;
+      let handleClick: (() => void) | undefined;
+      if (onClick && isSpecAction(onClick)) {
+        handleClick = () => {
+          const resolved = resolveAction(onClick, id, surface.surfaceId, dm);
+          onAction?.(resolved);
+        };
+      } else if (onClick) {
+        handleClick = () => onAction?.(onClick);
+      }
+
       return React.createElement(AccountCard, {
         key: id,
         accountType: node.accountType,
@@ -649,13 +830,12 @@ export function renderNode(
           variant: secondaryAction.variant,
         } : undefined,
         currency: node.currency || 'AUD',
-        onClick: node.onClick ? () => onAction?.(node.onClick) : undefined,
+        onClick: handleClick,
       });
     }
 
     case 'CategoryBadge': {
-      // Standardised on `label` — `content` kept as fallback for backward compat
-      const text = resolveBinding((node.label || node.content) as StringOrPath, dm);
+      const text = resolveBinding(node.label as StringOrPath, dm);
       return React.createElement(CategoryBadge, {
         key: id,
         color: node.color || 'blue',
@@ -669,10 +849,12 @@ export function renderNode(
     }
 
     case 'StatusBadge': {
+      const VALID_STATUSES = ['pending', 'completed', 'failed', 'cancelled', 'processing', 'scheduled'];
+      const status = VALID_STATUSES.includes(node.status) ? node.status : 'pending';
       const label = node.label ? resolveBinding(node.label as StringOrPath, dm) : undefined;
       return React.createElement(StatusBadge, {
         key: id,
-        status: node.status,
+        status,
         label,
         size: node.size || 'medium',
         showIcon: node.showIcon !== false,

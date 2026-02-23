@@ -2,6 +2,47 @@
 
 > Defines the quality bar for all demo flows. Established from the Fund Transfer flow polish (Phase 3). All flows must meet these criteria before being considered demo-ready.
 
+## Phase 3 Snapshot (23 Feb 2026)
+
+- Status: **Complete for current scope**
+- Completed in codebase: action format normalisation, CategoryBadge `label` standardisation, Card image placeholder removal, action follow-up loading indicator, targeted tests.
+- Deferred by decision: surface transition enhancements (`A2UISurface` fade/skeleton transition behaviour).
+- Sign-off: Fund Transfer walkthrough completed and accepted for demo scope.
+
+## Phase 4 Snapshot (Kickoff)
+
+- Status: **In progress**
+- Kickoff completed: Prompt consistency update to Australian `AccountCard.accountType` (`everyday`) across core flow prompts.
+- Guardrails added: Automated prompt consistency tests to prevent reintroducing legacy `transaction` account type examples.
+- Flow progress: `Account Overview` is now complete; `Transaction Search` is the next active flow.
+
+## Phase 4 Snapshot (Transaction Search pass)
+
+- Status: **In progress**
+- Completed in this pass: `Transaction Search` filter chips updated to local interactive pattern (`selected` data binding + `onClick` local updates).
+- Renderer improvements: boolean path bindings now supported for `BooleanChip.selected` and `Checkbox.checked`.
+- Guardrails added: regression tests for boolean binding + toggle action update behavior.
+
+## Phase 4 Snapshot (Spending Summary pass)
+
+- Status: **In progress**
+- Completed in this pass: Spending Summary prompt aligned to catalog-valid `MoneyDisplay` props/tokens and includes explicit `TransactionListItem` drilldown contract.
+- Guardrails added: prompt consistency tests now enforce Spending Summary `MoneyDisplay` size tokens and required category-drilldown example.
+- Follow-up: mock Spending Summary total now uses schema-valid `MoneyDisplay.size` (`large`).
+
+## Phase 4 Snapshot (Bill Payment pass)
+
+- Status: **In progress**
+- Completed in this pass: Bill Payment prompt now includes complete 4-step examples (select → form → review → success) and explicit mandatory rules for interactive bill selection and confirmation actions.
+- Guardrails added: prompt consistency tests now enforce Bill Payment review/success examples and required action names (`select_biller`, `review_payment`, `confirm_payment`, `back_to_form`).
+
+## Phase 4 Snapshot (Card Management pass)
+
+- Status: **Complete**
+- Completed in this pass: Card Management prompt now includes explicit unfreeze and lost-card report/recovery flows with concrete success screens.
+- Guardrails added: prompt consistency tests now enforce Card Management action coverage (`freeze_card`, `confirm_freeze`, `unfreeze_card`, `report_lost`, `confirm_report_lost`) and required follow-up examples.
+- Phase 4 outcome: all six demo flows now have completed prompt/interaction consistency passes.
+
 ---
 
 ## Visual Quality
@@ -12,10 +53,10 @@
 - [ ] **No visual overflow**: All content fits within the surface container without horizontal scrolling.
 
 ## Transitions & Loading
-- [x] **No blank flash between screens**: Previous surface dims/blurs during transition instead of being deleted. New content replaces old atomically when `createSurface` + `updateComponents` arrive.
-- [x] **Skeleton loading for empty surfaces**: When `createSurface` fires but components haven't arrived yet, skeleton placeholders are shown (not "Root component not found").
-- [x] **Fade-in animation**: New surfaces fade in with the `fadeInUp` animation for smooth appearance.
-- [ ] **Loading indicator visible**: Status indicator shows "Agent streaming UI updates..." during generation.
+- [ ] **No blank flash between screens**: Deferred for now by decision — keep current transition behaviour in `A2UISurface`.
+- [ ] **Skeleton loading for empty surfaces**: Deferred for now by decision — keep current `A2UISurface` behaviour.
+- [ ] **Fade-in animation**: Deferred for now by decision — no surface-level fade-in added.
+- [x] **Loading indicator visible**: Status indicator shows "Agent streaming UI updates..." during generation.
 
 ## Interaction & Actions
 - [x] **v0.9 action format**: All buttons use `action: { name, context }` format. Catalog resolves context paths from data model.
@@ -30,7 +71,7 @@
 - [ ] **Data binding resolution**: All `{ path: "/field" }` bindings resolve to correct values from the data model.
 
 ## Prop Naming Consistency
-- [x] **CategoryBadge uses `label`**: Standardised on `label` as the primary prop (not `content`). `content` kept as deprecated fallback.
+- [x] **CategoryBadge uses `label`**: Standardised on `label` only (schema, rules, prompts, renderer, tests).
 - [x] **Button uses `action`**: All buttons use `action` prop. `onClick` kept as alias for backward compat.
 - [ ] **onChange uses `eventType`/`dataPath`**: Form controls use the local data-binding format (not agent-round-trip actions).
 
@@ -47,15 +88,15 @@
 
 ---
 
-*Last updated: Phase 3 — Fund Transfer flow polish*
+*Last updated: Phase 4 complete (all flows)*
 
 ## Flow Status
 
 | Flow | Status | Notes |
 |------|--------|-------|
-| Fund Transfer | ⏳ Not started | Reference flow — polished first |
-| Account Overview | ⏳ Not started | |
-| Transaction Search | ⏳ Not started | |
-| Spending Summary | ⏳ Not started | |
-| Bill Payment | ⏳ Not started | |
-| Card Management | ⏳ Not started | |
+| Fund Transfer | ✅ Complete (scope) | Signed off for demo scope; transition enhancements intentionally deferred |
+| Account Overview | ✅ Complete | Clickable account cards wired and validated; prompt/account-type consistency pass complete |
+| Transaction Search | ✅ Complete | Interactive filter-chip pattern aligned with local data binding and tested |
+| Spending Summary | ✅ Complete | Prompt/schema alignment completed with category transaction drilldown coverage |
+| Bill Payment | ✅ Complete | Full 4-step flow examples and action contract guard tests added |
+| Card Management | ✅ Complete | Unfreeze and lost-card confirmation/success flows added with guard tests |

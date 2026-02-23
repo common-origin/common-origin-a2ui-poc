@@ -38,7 +38,7 @@ She is based in Melbourne, Australia. Use realistic AUD amounts and Australian m
 - MoneyDisplay: {"id":"x","component":"MoneyDisplay","amount":1234.56,"currency":"AUD","size":"large"|"medium"|"small","weight":"regular"|"bold","variant":"default"|"positive"|"negative"}
 - TransactionListItem: {"id":"x","component":"TransactionListItem","merchant":"Name","amount":-45.75,"date":"2026-01-15","status":"completed"|"pending"|"failed","category":"shopping"|"dining","currency":"AUD","onClick":{"name":"view_transaction","context":[...]}}
 - DateGroup: {"id":"x","component":"DateGroup","date":"2026-01-15","format":"relative"|"medium","showCount":true,"count":3,"currency":"AUD","children":["tx1","tx2"]}
-- AccountCard: {"id":"x","component":"AccountCard","accountName":"Name","accountNumber":"1234","balance":5000.00,"currency":"AUD","accountType":"savings"|"transaction"|"credit"}
+- AccountCard: {"id":"x","component":"AccountCard","accountName":"Name","accountNumber":"1234","balance":5000.00,"currency":"AUD","accountType":"everyday"|"savings"|"credit"}
 - Progress: {"id":"x","component":"Progress","value":75,"max":100,"label":"Label","variant":"determinate"}
 - CategoryBadge: {"id":"x","component":"CategoryBadge","category":"shopping"|"dining"|"transport"|"entertainment"|"bills"|"other","label":"Label"}
 - StatusBadge: {"id":"x","component":"StatusBadge","status":"completed"|"pending"|"failed","label":"Label"}
@@ -65,13 +65,14 @@ She is based in Melbourne, Australia. Use realistic AUD amounts and Australian m
 - When showing accounts, use AccountCard components with realistic balances
 - Always include context text (captions) that help the user understand what they're seeing
 - Prefer visual hierarchy: h1 for main title, h2 for sections, body for details, caption for context
+- For CategoryBadge, always use the 'label' prop (never 'content')
 
 # EXAMPLE 1 — Account overview
 
 User: "Show my accounts"
 
 {"createSurface":{"surfaceId":"main","catalogId":"${CATALOG_ID}"}}
-{"updateComponents":{"surfaceId":"main","components":[{"id":"root","component":"Stack","direction":"column","gap":"lg","children":["header","subtitle","accounts","actions"]},{"id":"header","component":"Text","text":"Your accounts","variant":"h1"},{"id":"subtitle","component":"Text","text":"Total balance: $40,697.85","variant":"caption"},{"id":"accounts","component":"Stack","direction":"column","gap":"md","children":["acc1","acc2","acc3","acc4"]},{"id":"acc1","component":"AccountCard","accountName":"Everyday Account","accountNumber":"7890","balance":3247.85,"currency":"AUD","accountType":"transaction"},{"id":"acc2","component":"AccountCard","accountName":"Goal Saver","accountNumber":"4567","balance":12450.00,"currency":"AUD","accountType":"savings"},{"id":"acc3","component":"AccountCard","accountName":"Offset Account","accountNumber":"1847","balance":25000.00,"currency":"AUD","accountType":"savings"},{"id":"acc4","component":"AccountCard","accountName":"Platinum Credit Card","accountNumber":"2103","balance":-1892.40,"currency":"AUD","accountType":"credit"},{"id":"actions","component":"Stack","direction":"row","gap":"sm","children":["transfer-btn","spending-btn"]},{"id":"transfer-btn","component":"Button","label":"Transfer funds","variant":"primary","action":{"name":"start_transfer","context":[]}},{"id":"spending-btn","component":"Button","label":"View spending","variant":"secondary","action":{"name":"view_spending","context":[]}}]}}
+{"updateComponents":{"surfaceId":"main","components":[{"id":"root","component":"Stack","direction":"column","gap":"lg","children":["header","subtitle","accounts","actions"]},{"id":"header","component":"Text","text":"Your accounts","variant":"h1"},{"id":"subtitle","component":"Text","text":"Total balance: $40,697.85","variant":"caption"},{"id":"accounts","component":"Stack","direction":"column","gap":"md","children":["acc1","acc2","acc3","acc4"]},{"id":"acc1","component":"AccountCard","accountName":"Everyday Account","accountNumber":"7890","balance":3247.85,"currency":"AUD","accountType":"everyday"},{"id":"acc2","component":"AccountCard","accountName":"Goal Saver","accountNumber":"4567","balance":12450.00,"currency":"AUD","accountType":"savings"},{"id":"acc3","component":"AccountCard","accountName":"Offset Account","accountNumber":"1847","balance":25000.00,"currency":"AUD","accountType":"savings"},{"id":"acc4","component":"AccountCard","accountName":"Platinum Credit Card","accountNumber":"2103","balance":-1892.40,"currency":"AUD","accountType":"credit"},{"id":"actions","component":"Stack","direction":"row","gap":"sm","children":["transfer-btn","spending-btn"]},{"id":"transfer-btn","component":"Button","label":"Transfer funds","variant":"primary","action":{"name":"start_transfer","context":[]}},{"id":"spending-btn","component":"Button","label":"View spending","variant":"secondary","action":{"name":"view_spending","context":[]}}]}}
 
 # EXAMPLE 2 — Help / what can I do
 

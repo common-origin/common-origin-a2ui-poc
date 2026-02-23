@@ -41,6 +41,22 @@ function generateCreateSurface(): A2UIMessage {
   };
 }
 
+function generateInitialDataModelMessage(): A2UIMessage {
+  return {
+    updateDataModel: {
+      surfaceId: 'main',
+      value: {
+        query: '',
+        filters: {
+          last30Days: true,
+          moneyOut: true,
+          card: false,
+        },
+      },
+    },
+  };
+}
+
 /** Generate the initial UI structure components */
 function generateInitialUIMessages(): A2UIMessage[] {
   return [
@@ -131,19 +147,22 @@ function generateFilterSectionMessages(): A2UIMessage[] {
             id: 'chip-time',
             component: 'BooleanChip',
             content: 'Last 30 days',
-            selected: true,
+            selected: { path: '/filters/last30Days' },
+            onClick: { eventType: 'change', dataPath: 'filters.last30Days' },
           },
           {
             id: 'chip-direction',
             component: 'BooleanChip',
             content: 'Money out',
-            selected: true,
+            selected: { path: '/filters/moneyOut' },
+            onClick: { eventType: 'change', dataPath: 'filters.moneyOut' },
           },
           {
             id: 'chip-method',
             component: 'BooleanChip',
             content: 'Card',
-            selected: false,
+            selected: { path: '/filters/card' },
+            onClick: { eventType: 'change', dataPath: 'filters.card' },
           },
         ],
       },
@@ -266,6 +285,7 @@ export async function streamTransactionFinderUI(
 
   // Phase 0: Create surface (must be first)
   onMessage(generateCreateSurface());
+  onMessage(generateInitialDataModelMessage());
 
   // Phase 1: Initial structure
   await sendWithDelay(generateInitialUIMessages(), 100);
@@ -290,6 +310,7 @@ export async function streamTransactionFinderUI(
 export function getTransactionFinderUIMessages(showEmptyState: boolean = false): A2UIMessage[] {
   const messages: A2UIMessage[] = [
     generateCreateSurface(),
+    generateInitialDataModelMessage(),
     ...generateInitialUIMessages(),
     ...generateSearchSectionMessages(),
     ...generateFilterSectionMessages(),

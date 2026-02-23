@@ -39,13 +39,18 @@ Last month (January) she spent $2,410.50. Her groceries are trending up (+12%) d
 {"id":"x","component":"Card","variant":"outlined"|"filled","children":["child-id"]}
 
 ## MoneyDisplay — Currency amount
-{"id":"x","component":"MoneyDisplay","amount":1234.56,"currency":"AUD","size":"lg"|"md"|"sm","trend":"up"|"down"|"neutral","label":"Label"}
+{"id":"x","component":"MoneyDisplay","amount":1234.56,"currency":"AUD","size":"small"|"medium"|"large","weight":"regular"|"medium"|"bold","variant":"default"|"positive"|"negative"}
+
+## TransactionListItem — Transaction display (clickable for drill-down)
+{"id":"x","component":"TransactionListItem","merchant":"Name","amount":-45.75,"date":"2026-02-17","status":"completed"|"pending"|"failed","category":"shopping"|"dining"|"transport"|"entertainment"|"bills"|"health"|"other","currency":"AUD","onClick":{"name":"view_transaction","context":[{"key":"merchant","value":"Name"},{"key":"amount","value":-45.75},{"key":"date","value":"2026-02-17"},{"key":"category","value":"shopping"},{"key":"status","value":"completed"}]}}
 
 ## Progress — Percentage bar
 {"id":"x","component":"Progress","value":75,"max":100,"label":"Category","variant":"determinate"}
 
 ## CategoryBadge — Spending category badge
 {"id":"x","component":"CategoryBadge","category":"shopping"|"dining"|"transport"|"entertainment"|"bills"|"other","label":"Shopping"}
+
+Use only the 'label' prop for CategoryBadge (do not use 'content').
 
 ## Button — Action button (use action with name + context)
 {"id":"x","component":"Button","label":"Label","variant":"primary"|"secondary"|"text","action":{"name":"action_name","context":[{"key":"field","value":"value"}]}}
@@ -79,6 +84,13 @@ User: 'The user performed action "compare_spending" with the following details: 
 
 {"createSurface":{"surfaceId":"main","catalogId":"${CATALOG_ID}"}}
 {"updateComponents":{"surfaceId":"main","components":[{"id":"root","component":"Stack","direction":"column","gap":"lg","children":["back-btn","header","comparison","category-changes","actions"]},{"id":"back-btn","component":"Button","label":"← Back to summary","variant":"text","action":{"name":"back_to_summary","context":[]}},{"id":"header","component":"Text","text":"Month-over-month comparison","variant":"h1"},{"id":"comparison","component":"Card","variant":"filled","children":["compare-stack"]},{"id":"compare-stack","component":"Stack","direction":"column","gap":"md","children":["this-month","last-month","change"]},{"id":"this-month","component":"Stack","direction":"row","gap":"sm","children":["this-label","this-amount"]},{"id":"this-label","component":"Text","text":"February 2026","variant":"body"},{"id":"this-amount","component":"MoneyDisplay","amount":-2847.30,"currency":"AUD","size":"medium","weight":"bold"},{"id":"last-month","component":"Stack","direction":"row","gap":"sm","children":["last-label","last-amount"]},{"id":"last-label","component":"Text","text":"January 2026","variant":"body"},{"id":"last-amount","component":"MoneyDisplay","amount":-2410.50,"currency":"AUD","size":"medium"},{"id":"change","component":"Alert","content":"You've spent $436.80 more this month (+18.1%). The biggest increase is in Groceries (+$65) and Dining (+$85).","variant":"warning","title":"Spending increased"},{"id":"category-changes","component":"Stack","direction":"column","gap":"sm","children":["changes-header","change1","change2","change3"]},{"id":"changes-header","component":"Text","text":"Category changes","variant":"h2"},{"id":"change1","component":"Text","text":"🛒 Groceries: $620 vs $555 (↑ 12%)","variant":"body"},{"id":"change2","component":"Text","text":"🍽️ Dining: $385 vs $300 (↑ 28%)","variant":"body"},{"id":"change3","component":"Text","text":"🚗 Transport: $342 vs $380 (↓ 10%)","variant":"body"},{"id":"actions","component":"Stack","direction":"row","gap":"sm","children":["summary-btn"]},{"id":"summary-btn","component":"Button","label":"Back to spending summary","variant":"secondary","action":{"name":"back_to_summary","context":[]}}]}}
+
+# EXAMPLE 3 — Category transactions (after view_category_transactions action)
+
+User: 'The user performed action "view_category_transactions" with the following details: category: groceries'
+
+{"createSurface":{"surfaceId":"main","catalogId":"${CATALOG_ID}"}}
+{"updateComponents":{"surfaceId":"main","components":[{"id":"root","component":"Stack","direction":"column","gap":"lg","children":["back-btn","header","summary","results"]},{"id":"back-btn","component":"Button","label":"← Back to spending summary","variant":"text","action":{"name":"back_to_summary","context":[]}},{"id":"header","component":"Text","text":"Groceries transactions","variant":"h1"},{"id":"summary","component":"Text","text":"12 transactions · Total $620.00 · February 2026","variant":"caption"},{"id":"results","component":"Stack","direction":"column","gap":"none","children":["tx1","tx2","tx3","tx4"]},{"id":"tx1","component":"TransactionListItem","merchant":"Woolworths Metro CBD","amount":-87.43,"date":"2026-02-18","status":"completed","category":"shopping","currency":"AUD","onClick":{"name":"view_transaction","context":[{"key":"merchant","value":"Woolworths Metro CBD"},{"key":"amount","value":-87.43},{"key":"date","value":"2026-02-18"},{"key":"category","value":"shopping"},{"key":"status","value":"completed"}]}},{"id":"tx2","component":"TransactionListItem","merchant":"Coles Express Fitzroy","amount":-64.20,"date":"2026-02-16","status":"completed","category":"shopping","currency":"AUD","onClick":{"name":"view_transaction","context":[{"key":"merchant","value":"Coles Express Fitzroy"},{"key":"amount","value":-64.20},{"key":"date","value":"2026-02-16"},{"key":"category","value":"shopping"},{"key":"status","value":"completed"}]}},{"id":"tx3","component":"TransactionListItem","merchant":"Aldi Northcote","amount":-41.95,"date":"2026-02-14","status":"completed","category":"shopping","currency":"AUD","onClick":{"name":"view_transaction","context":[{"key":"merchant","value":"Aldi Northcote"},{"key":"amount","value":-41.95},{"key":"date","value":"2026-02-14"},{"key":"category","value":"shopping"},{"key":"status","value":"completed"}]}},{"id":"tx4","component":"TransactionListItem","merchant":"Woolworths Online","amount":-39.80,"date":"2026-02-12","status":"pending","category":"shopping","currency":"AUD","onClick":{"name":"view_transaction","context":[{"key":"merchant","value":"Woolworths Online"},{"key":"amount","value":-39.80},{"key":"date","value":"2026-02-12"},{"key":"category","value":"shopping"},{"key":"status","value":"pending"}]}}]}}
 
 Generate your response now.`;
 }

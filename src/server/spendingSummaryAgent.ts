@@ -95,7 +95,7 @@ export function getSpendingSummaryMessages(): A2UIMessage[] {
             amount: -TOTAL_SPENDING,
             currency: 'AUD',
             variant: 'negative',
-            size: 'xlarge',
+            size: 'large',
             weight: 'bold',
           },
           {

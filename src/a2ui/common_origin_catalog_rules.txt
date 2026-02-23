@@ -8,7 +8,7 @@
 - For 'NumberField', you MUST provide 'label'.
 - For 'Select', you MUST provide 'label' and 'options'. Each option needs 'value' and 'label'.
 - For 'Checkbox', you MUST provide 'label'.
-- For 'Button', you MUST provide 'label'. Either 'action' or 'onClick' dispatches the click action.
+- For 'Button', you MUST provide 'label'. Use 'action' with v0.9 format: {"name":"action_name","context":[{"key":"field","value":"value"}]}. 'onClick' is a legacy fallback.
 - For 'Chip', 'FilterChip', 'BooleanChip', you MUST provide 'content'.
 - For 'Card', you MUST provide 'title'.
 - For 'List', you MUST provide 'children'.
@@ -17,6 +17,7 @@
 - For 'MoneyDisplay', you MUST provide 'amount' (a number). Defaults: currency=AUD, locale=en-AU.
 - For 'TransactionListItem', you MUST provide 'merchant', 'amount', and 'date'. The 'status' should be one of: completed, pending, failed, cancelled, processing, refunded. The 'category' should be one of: shopping, dining, transport, entertainment, bills, health, education, other.
 - For 'AccountCard', you MUST provide 'accountName' and 'balance'. The 'accountType' should be one of: everyday, savings, credit, mortgage, term-deposit.
+- For 'CategoryBadge', you MUST provide 'label'. Do not use 'content'.
 - For 'StatusBadge', you MUST provide 'status' (same values as TransactionListItem).
 - For 'TabBar', you MUST provide 'tabs' (array of {id, label}).
 - For 'ActionSheet', you MUST provide 'actions' (array of {id, label}).
@@ -30,4 +31,8 @@
 
 **CURRENCY:** All monetary amounts default to AUD. Always use negative numbers for debits/expenses and positive for credits/income.
 
-**ACTIONS:** Action objects have { "name": "actionName", "context": { ... } }. Use 'dataPath' to specify which data model key to update with the new value.
+**ACTIONS:**
+- For Button interactions, use: { "name": "actionName", "context": [{ "key": "field", "value": "value" }] }.
+- Use { "path": "/field" } inside context values when you need runtime data-model resolution.
+- For list-style interactive components (for example ListItem, TransactionListItem), use 'onClick' with the same v0.9 shape: { "name": "actionName", "context": [...] }.
+- For form controls (TextField, NumberField, Select, Checkbox), use local onChange with 'eventType' + 'dataPath' to update the local data model.

@@ -557,7 +557,7 @@
         },
         "category": {
           "type": "string",
-          "enum": ["shopping", "dining", "transport", "entertainment", "bills", "health", "education", "other"]
+          "enum": ["shopping", "dining", "transport", "entertainment", "bills", "health", "education", "income", "other"]
         },
         "merchantLogo": { "type": "string", "description": "URL to merchant logo image." },
         "description": { "$ref": "#/$defs/stringOrPath" },
@@ -621,8 +621,7 @@
       "properties": {
         "id": true,
         "component": { "const": "CategoryBadge" },
-        "label": { "$ref": "#/$defs/stringOrPath", "description": "Badge text (primary prop)." },
-        "content": { "$ref": "#/$defs/stringOrPath", "description": "Deprecated alias for label." },
+        "label": { "$ref": "#/$defs/stringOrPath", "description": "Badge text." },
         "color": {
           "type": "string",
           "enum": ["blue", "green", "red", "orange", "purple", "teal", "pink", "grey"]
@@ -639,7 +638,7 @@
         "onClick": { "$ref": "#/$defs/actionObject" },
         "disabled": { "type": "boolean" }
       },
-      "required": ["id", "component"],
+      "required": ["id", "component", "label"],
       "additionalProperties": false
     },
 
