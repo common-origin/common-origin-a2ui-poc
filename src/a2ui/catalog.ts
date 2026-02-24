@@ -487,7 +487,7 @@ export function renderNode(
           onAction?.({
             ...onChange,
             value: resolvedValue,
-            updateDataModel: toDataModelUpdate(onChange.dataPath, resolvedValue),
+            updateDataModel: toDataModelUpdate(onChange.dataPath, resolvedValue, dm),
           });
         };
       } else if (valueText !== undefined) {
