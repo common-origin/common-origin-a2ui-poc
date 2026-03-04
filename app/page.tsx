@@ -447,24 +447,30 @@ export default function Home() {
           aria-label="Generated UI content"
           aria-hidden={!hasSubmitted}
         >
-          {hasSubmitted && (
-            <>
-              {(isGenerating || hasGenerated) && (
-                <StatusIndicator 
-                  $isGenerating={isGenerating}
-                  role="status"
-                  aria-live="polite"
-                  aria-atomic="true"
-                >
-                  {isGenerating ? 'Agent streaming UI updates...' : 'UI generation complete'}
-                </StatusIndicator>
-              )}
-              <A2UIErrorBoundary>
-                <A2UISurface surfaceId="main" onAction={handleUserAction} />
-              </A2UIErrorBoundary>
-
-            </>
+          {hasSubmitted && (isGenerating || hasGenerated) && (
+            <StatusIndicator
+              $isGenerating={isGenerating}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {isGenerating ? 'Agent streaming UI updates...' : 'UI generation complete'}
+            </StatusIndicator>
           )}
+          {/*
+           * A2UISurface is always mounted (not gated behind hasSubmitted).
+           *
+           * Reason: the surface registers its message handler in a useEffect.
+           * If it were only mounted after hasSubmitted=true, the mock agent
+           * (which is near-synchronous) would dispatch messages before the
+           * useEffect fires, the dispatch() call in SurfaceContext would find
+           * no registered handler, and the messages would be silently dropped.
+           * SurfaceContext's pending-queue provides a second safety net, but
+           * keeping the surface always mounted is the primary fix.
+           */}
+          <A2UIErrorBoundary>
+            <A2UISurface surfaceId="main" onAction={handleUserAction} />
+          </A2UIErrorBoundary>
         </SurfaceContainer>
       </PageContainer>
     </PageWrapper>

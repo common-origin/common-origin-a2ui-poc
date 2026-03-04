@@ -40,18 +40,44 @@ const SurfaceContext = createContext<SurfaceRegistry | null>(null);
 export function A2UISurfaceProvider({ children }: { children: React.ReactNode }) {
   const handlers = useRef<Map<string, SurfaceHandler>>(new Map());
 
+  /**
+   * Pre-registration message queue.
+   *
+   * Problem: the mock agent (and fast real-agent first chunks) can dispatch
+   * messages before A2UISurface has mounted and called register(). When
+   * dispatch() finds no handler the message is silently dropped — the surface
+   * never renders even though callAgent() resolves successfully.
+   *
+   * Solution: buffer messages for unknown surface IDs here. When register()
+   * is called, flush the buffer to the now-registered handler immediately.
+   */
+  const pendingQueues = useRef<Map<string, A2UIMessage[]>>(new Map());
+
   const register = useCallback((surfaceId: string, handler: SurfaceHandler) => {
     handlers.current.set(surfaceId, handler);
+
+    // Flush any messages that arrived before this surface registered
+    const queued = pendingQueues.current.get(surfaceId);
+    if (queued && queued.length > 0) {
+      handler.processMessages(queued);
+      pendingQueues.current.delete(surfaceId);
+    }
   }, []);
 
   const unregister = useCallback((surfaceId: string) => {
     handlers.current.delete(surfaceId);
+    // Keep the pending queue — the surface may remount before new messages arrive
   }, []);
 
   const dispatch = useCallback((surfaceId: string, message: A2UIMessage) => {
     const handler = handlers.current.get(surfaceId);
     if (handler) {
       handler.processMessage(message);
+    } else {
+      // Surface not yet registered — buffer the message
+      const queue = pendingQueues.current.get(surfaceId) ?? [];
+      queue.push(message);
+      pendingQueues.current.set(surfaceId, queue);
     }
   }, []);
 
@@ -59,6 +85,11 @@ export function A2UISurfaceProvider({ children }: { children: React.ReactNode })
     const handler = handlers.current.get(surfaceId);
     if (handler) {
       handler.processMessages(messages);
+    } else {
+      // Surface not yet registered — buffer all messages
+      const queue = pendingQueues.current.get(surfaceId) ?? [];
+      queue.push(...messages);
+      pendingQueues.current.set(surfaceId, queue);
     }
   }, []);
 
