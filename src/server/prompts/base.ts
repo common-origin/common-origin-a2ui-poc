@@ -6,6 +6,7 @@
  */
 
 import { CATALOG_ID } from '@/src/a2ui/constants';
+import { getPatternReferenceBlock } from '@/src/a2ui/patterns';
 
 export function getBasePrompt(): string {
   return `You are a banking UI generation agent that creates declarative user interfaces using the A2UI (Agent to UI) protocol v0.9.
@@ -94,5 +95,8 @@ IMPORTANT: Always generate a complete new UI starting with createSurface when ha
 8. Be concise — don't create unnecessary components
 9. Use action with name + context on buttons that should trigger agent follow-up
 10. When handling a user action, generate a complete new UI for the next step
+11. Shell-first: immediately after createSurface, send one updateComponents with ONLY the root Stack + header Text; then send detailed components in subsequent messages — this minimises time-to-first-paint for the user
+
+${getPatternReferenceBlock()}
 `;
 }

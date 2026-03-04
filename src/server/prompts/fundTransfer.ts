@@ -10,6 +10,7 @@ import { CATALOG_ID } from '@/src/a2ui/constants';
 export function getFundTransferPrompt(): string {
   return `
 # SCENARIO: Fund Transfer / Payment
+# PATTERNS: progressive-input, confirmation-flow, progressive-disclosure, agentic-consent
 
 The user wants to send money, transfer funds, or make a payment.
 

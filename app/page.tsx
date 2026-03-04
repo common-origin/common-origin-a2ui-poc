@@ -9,24 +9,46 @@
  * - All components come from trusted catalog
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect, type ComponentType } from 'react';
 import { A2UISurface, useA2UISurface } from '@/src/components/A2UISurface';
 import { A2UIErrorBoundary } from '@/src/components/A2UIErrorBoundary';
-import { callAgent, getAgentMode, isRealAgentAvailable, type ConversationTurn } from '@/src/lib/agentClient';
-import { analyzeQuery, getUnknownQueryResponse } from '@/src/server/queryRouter';
+import { callAgent, getAgentMode, type ConversationTurn } from '@/src/lib/agentClient';
+import { pipelineTimer } from '@/src/lib/latencyTracker';
+import { analyzeQuery } from '@/src/server/queryRouter';
 import { CATALOG_ID } from '@/src/a2ui/catalog';
 import { createLogger } from '@/src/lib/logger';
 import type { UserActionMessage } from '@/src/a2ui/types';
 import styled from 'styled-components';
+import * as CommonOriginDesignSystem from '@common-origin/design-system';
 import {
-  Button,
-  Typography,
-  Stack,
   Box,
-  Chip,
   Alert,
-  TextField,
+  Button,
 } from '@common-origin/design-system';
+
+type AgentInputSubmitPayload = { text: string };
+type AgentInputVoiceErrorPayload = { message: string };
+
+type AgentInputCompatProps = {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: (payload: AgentInputSubmitPayload) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  isSubmitting?: boolean;
+  enableVoice?: boolean;
+  voiceLanguage?: string;
+  noSpeechTimeoutMs?: number;
+  label?: string;
+  statusMessage?: string;
+  errorMessage?: string;
+  onVoiceStart?: () => void;
+  onVoiceError?: (error: AgentInputVoiceErrorPayload) => void;
+};
+
+const AgentInput = (CommonOriginDesignSystem as unknown as {
+  AgentInput: ComponentType<AgentInputCompatProps>;
+}).AgentInput;
 
 // Custom wrapper for page-level styling and animation
 const PageWrapper = styled.div`
@@ -48,18 +70,32 @@ const PageContainer = styled.div`
   max-width: 800px;
   margin: 0 auto;
   padding: 2rem 1rem;
+  min-height: 100vh;
 
   @media (max-width: 640px) {
     padding: 1rem 0.75rem;
   }
 `;
 
-const QueryRow = styled.div`
+const InputStage = styled.div<{ $hasSubmitted: boolean }>`
+  min-height: ${props => (props.$hasSubmitted ? '3rem' : '60vh')};
+  display: flex;
+  align-items: center;
+  transition: min-height 0.4s ease-in-out;
+
+  @media (max-width: 640px) {
+    min-height: ${props => (props.$hasSubmitted ? '2rem' : '55vh')};
+  }
+`;
+
+const QueryRow = styled.div<{ $hasSubmitted: boolean }>`
   display: flex;
   gap: 0.75rem;
   align-items: flex-end;
   max-width: 800px;
-  margin: 0 auto 2rem;
+  margin: 0 auto ${props => (props.$hasSubmitted ? '2rem' : '0')};
+  width: 100%;
+  transition: margin 0.3s ease;
 
   & > div:first-child {
     flex: 1;
@@ -72,16 +108,28 @@ const QueryRow = styled.div`
   }
 `;
 
-const SurfaceContainer = styled.main`
+const TopRightControls = styled.div`
+  position: fixed;
+  top: 1rem;
+  right: 1.25rem;
+  z-index: 100;
+`;
+
+const SurfaceContainer = styled.main<{ $visible: boolean }>`
   max-width: 800px;
   margin: 0 auto;
   background: var(--surface);
   border-radius: 1rem;
-  padding: 2rem;
-  box-shadow: 0 4px 6px var(--shadow);
-  border: 1px solid var(--border);
-  min-height: 400px;
-  transition: box-shadow 0.3s ease;
+  padding: ${props => (props.$visible ? '2rem' : '0')};
+  box-shadow: ${props => (props.$visible ? '0 4px 6px var(--shadow)' : 'none')};
+  border: ${props => (props.$visible ? '1px solid var(--border)' : '0')};
+  min-height: ${props => (props.$visible ? '400px' : '0')};
+  max-height: ${props => (props.$visible ? '1200px' : '0')};
+  overflow: hidden;
+  pointer-events: ${props => (props.$visible ? 'auto' : 'none')};
+  opacity: ${props => (props.$visible ? 1 : 0)};
+  transform: ${props => (props.$visible ? 'translateY(0)' : 'translateY(8px)')};
+  transition: opacity 0.35s ease, transform 0.35s ease, max-height 0.35s ease, padding 0.35s ease, box-shadow 0.3s ease;
 
   @media (max-width: 640px) {
     padding: 1rem;
@@ -129,27 +177,26 @@ const log = createLogger('Demo');
 export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [agentMode, setAgentMode] = useState<'mock' | 'real'>(getAgentMode());
-  const [realAgentAvailable, setRealAgentAvailable] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const [agentMode] = useState<'mock' | 'real'>(getAgentMode());
   const [conversationHistory, setConversationHistory] = useState<ConversationTurn[]>([]);
   const { sendMessage } = useA2UISurface('main');
-
-  // Check if real agent is available on mount
-  useEffect(() => {
-    isRealAgentAvailable().then(setRealAgentAvailable);
-  }, []);
 
   const handleSubmit = async (userQuery?: string) => {
     const queryToProcess = userQuery || query;
     if (!queryToProcess.trim() || isGenerating) return;
 
+    pipelineTimer.reset();
+    pipelineTimer.mark('submit');
+    setHasSubmitted(true);
     setIsGenerating(true);
     setHasGenerated(false);
     setError(null);
+    setSpeechError(null);
     setQuery('');
-
     // Analyze query and get scenario hint
     const analysis = analyzeQuery(queryToProcess);
     log.info('Query analysis', { query: queryToProcess, scenario: analysis.scenario, intent: analysis.intent });
@@ -226,12 +273,7 @@ export default function Home() {
 
     setIsGenerating(false);
     setHasGenerated(true);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !isGenerating) {
-      handleSubmit();
-    }
+    pipelineTimer.logReport('A2UI pipeline');
   };
 
   /**
@@ -247,7 +289,7 @@ export default function Home() {
     const msg = action as UserActionMessage;
     if (!msg?.userAction?.name) return;
 
-    const { name, context, surfaceId } = msg.userAction;
+    const { name, context } = msg.userAction;
     log.info('UserAction received', { name, context });
 
     // Compose a natural-language follow-up prompt describing the user action
@@ -321,154 +363,108 @@ export default function Home() {
     setHasGenerated(true);
   }, [agentMode, conversationHistory, sendMessage]);
 
-  const handleExampleClick = (example: string) => {
-    setQuery(example);
-    handleSubmit(example);
-  };
-
   return (
     <PageWrapper>
+      {/* Future: browsing-token personalisation hook point — see STRATEGY.md */}
+      <TopRightControls>
+        <Button variant="naked" size="small" onClick={() => {}} aria-label="Preferences (coming soon)">
+          Preferences
+        </Button>
+      </TopRightControls>
       <PageContainer>
-        {/* Header */}
-        <header style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ marginBottom: '0.5rem' }}>
-            <Typography variant="h1">
-              A2UI + Common Origin Demo
-            </Typography>
-          </div>
-          <div style={{ color: 'var(--muted)', fontSize: '1.125rem' }}>
-            <Typography variant="body">
-              Agent-generated UI rendered through a trusted component catalog
-            </Typography>
-          </div>
-        </header>
-
-        {/* Agent Mode Toggle */}
-        {realAgentAvailable && (
-          <Box style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center', gap: '1rem', alignItems: 'center' }} role="group" aria-labelledby="agent-mode-label">
-            <span id="agent-mode-label" style={{ fontSize: '0.875rem', color: 'var(--muted)', fontWeight: 500 }}>
-              Agent Mode:
-            </span>
-            <Stack direction="row" gap="xs">
-              <Chip
-                onClick={() => setAgentMode('mock')}
-                variant={agentMode === 'mock' ? 'emphasis' : 'subtle'}
-                aria-label="Use mock agent"
-                aria-pressed={agentMode === 'mock'}
-              >
-                Mock
-              </Chip>
-              <Chip
-                onClick={() => setAgentMode('real')}
-                variant={agentMode === 'real' ? 'emphasis' : 'subtle'}
-                aria-label="Use real Gemini agent"
-                aria-pressed={agentMode === 'real'}
-              >
-                Real (Gemini)
-              </Chip>
-            </Stack>
-          </Box>
-        )}
-
-        {/* Security Info Banner */}
-        <Box style={{ marginBottom: '2rem' }}>
-          <Alert variant="info" title="Security Model">
-            The agent sends only declarative JSON (A2UI messages), not executable code. 
-            All UI components are rendered from a pre-approved catalog mapped to{' '}
-            <code>@common-origin/design-system</code>. This prevents UI injection attacks 
-            and ensures consistent design.
-          </Alert>
-        </Box>
-
-        {/* Error Display */}
-        {error && !isGenerating && (
-          <Box style={{ marginBottom: '1rem' }}>
-            <Alert variant="error" title="Agent Error">
-              {error}
-              {' '}
-              {agentMode === 'real' && (
-                <span>The mock agent was used as fallback.</span>
-              )}
-            </Alert>
-          </Box>
-        )}
-
-        {/* Example Query Chips */}
-        <div style={{ marginBottom: '1rem' }} role="group" aria-label="Example queries">
-          <Stack 
-            direction="row" 
-            gap="sm" 
-            justifyContent="center"
-            wrap={true}
-          >
-            <Chip
-              onClick={!isGenerating ? () => handleExampleClick('Find my Woolworths transactions') : undefined}
-              aria-label="Find my Woolworths transactions"
-              disabled={isGenerating}
-            >
-              Find transactions
-            </Chip>
-            <Chip
-              onClick={!isGenerating ? () => handleExampleClick('Show spending summary') : undefined}
-              aria-label="Show spending summary"
-              disabled={isGenerating}
-            >
-              Spending summary
-            </Chip>
-            <Chip
-              onClick={!isGenerating ? () => handleExampleClick('Transfer $100 to savings') : undefined}
-              aria-label="Transfer $100 to savings"
-              disabled={isGenerating}
-            >
-              Transfer money
-            </Chip>
-          </Stack>
-        </div>
-
         {/* Query Input */}
-        <QueryRow>
-          <div>
-            <TextField
-              type="text"
-              placeholder="Ask me about transactions, spending, or transfers..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={isGenerating}
-              label="Banking query"
-              aria-describedby="query-help"
-            />
-            <span id="query-help" style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.25rem', display: 'block' }}>
-              Try asking about transactions, spending, or transfers
-            </span>
-          </div>
-          <Button
-            variant="primary"
-            onClick={() => handleSubmit()}
-            disabled={isGenerating || !query.trim()}
-            aria-label={isGenerating ? 'Generating UI' : 'Submit query'}
-          >
-            {isGenerating ? 'Generating...' : 'Submit'}
-          </Button>
-        </QueryRow>
+        <InputStage $hasSubmitted={hasSubmitted}>
+          <QueryRow $hasSubmitted={hasSubmitted}>
+            <div>
+              <AgentInput
+                value={query}
+                onChange={setQuery}
+                onSubmit={(payload: AgentInputSubmitPayload) => handleSubmit(payload.text)}
+                placeholder="Ask a banking question"
+                disabled={isGenerating}
+                isSubmitting={isGenerating}
+                enableVoice={true}
+                voiceLanguage="en-AU"
+                noSpeechTimeoutMs={8000}
+                label="Banking query"
+                statusMessage={isGenerating ? 'Generating UI...' : undefined}
+                errorMessage={speechError ?? undefined}
+                onVoiceStart={() => setSpeechError(null)}
+                onVoiceError={(voiceError: AgentInputVoiceErrorPayload) => setSpeechError(voiceError.message)}
+              />
+            </div>
+          </QueryRow>
+        </InputStage>
+
+        {hasSubmitted && (
+          <>
+
+            {/* Agent Mode Toggle */}
+            {/* {realAgentAvailable && (
+              <Box style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center', gap: '1rem', alignItems: 'center' }} role="group" aria-labelledby="agent-mode-label">
+                <span id="agent-mode-label" style={{ fontSize: '0.875rem', color: 'var(--muted)', fontWeight: 500 }}>
+                  Agent Mode:
+                </span>
+                <Stack direction="row" gap="xs">
+                  <Chip
+                    onClick={() => setAgentMode('mock')}
+                    variant={agentMode === 'mock' ? 'emphasis' : 'subtle'}
+                    aria-label="Use mock agent"
+                    aria-pressed={agentMode === 'mock'}
+                  >
+                    Mock
+                  </Chip>
+                  <Chip
+                    onClick={() => setAgentMode('real')}
+                    variant={agentMode === 'real' ? 'emphasis' : 'subtle'}
+                    aria-label="Use real Gemini agent"
+                    aria-pressed={agentMode === 'real'}
+                  >
+                    Real (Gemini)
+                  </Chip>
+                </Stack>
+              </Box>
+            )} */}
+
+            {/* Error Display */}
+            {error && !isGenerating && (
+              <Box style={{ marginBottom: '1rem' }}>
+                <Alert variant="error" title="Agent Error">
+                  {error}
+                  {' '}
+                  {agentMode === 'real' && (
+                    <span>The mock agent was used as fallback.</span>
+                  )}
+                </Alert>
+              </Box>
+            )}
+          </>
+        )}
 
         {/* Surface Container */}
         <SurfaceContainer
+          $visible={hasSubmitted}
           aria-label="Generated UI content"
+          aria-hidden={!hasSubmitted}
         >
-          {(isGenerating || hasGenerated) && (
-            <StatusIndicator 
-              $isGenerating={isGenerating}
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              {isGenerating ? 'Agent streaming UI updates...' : 'UI generation complete'}
-            </StatusIndicator>
+          {hasSubmitted && (
+            <>
+              {(isGenerating || hasGenerated) && (
+                <StatusIndicator 
+                  $isGenerating={isGenerating}
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {isGenerating ? 'Agent streaming UI updates...' : 'UI generation complete'}
+                </StatusIndicator>
+              )}
+              <A2UIErrorBoundary>
+                <A2UISurface surfaceId="main" onAction={handleUserAction} />
+              </A2UIErrorBoundary>
+
+            </>
           )}
-          <A2UIErrorBoundary>
-            <A2UISurface surfaceId="main" onAction={handleUserAction} />
-          </A2UIErrorBoundary>
         </SurfaceContainer>
       </PageContainer>
     </PageWrapper>

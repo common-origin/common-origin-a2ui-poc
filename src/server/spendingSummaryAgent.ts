@@ -192,8 +192,13 @@ export async function streamSpendingSummaryUI(
 ): Promise<void> {
   const messages = getSpendingSummaryMessages();
 
+  const demoDelay = (ms: number): Promise<void> =>
+    process.env.NEXT_PUBLIC_DEMO_TIMING === 'true'
+      ? new Promise<void>((resolve) => setTimeout(resolve, ms))
+      : Promise.resolve();
+
   for (const message of messages) {
     onMessage(message);
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await demoDelay(150);
   }
 }

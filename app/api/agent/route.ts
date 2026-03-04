@@ -8,6 +8,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSystemPrompt } from '@/src/server/systemPrompt';
 import { analyzeQuery } from '@/src/server/queryRouter';
+import { trimConversationHistory } from '@/src/lib/conversationHistory';
 import type { ScenarioType } from '@/src/server/queryRouter';
 import { createLogger, truncate } from '@/src/lib/logger';
 import type { NextRequest } from 'next/server';
@@ -62,31 +63,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the Gemini model with scenario-specific prompt
+    // Get the Gemini model with scenario-specific + preferences prompt
     // Use client-provided scenario if valid, otherwise detect from query
     const validScenarios: ScenarioType[] = ['transaction-search', 'spending-summary', 'fund-transfer', 'account-overview', 'bill-payment', 'card-management', 'unknown'];
     const detectedScenario: ScenarioType = validScenarios.includes(scenario as ScenarioType)
       ? (scenario as ScenarioType)
       : analyzeQuery(query).scenario;
+
+    // Merge user preferences block (if provided) into the system prompt
+    const preferences: string | undefined = typeof body.preferences === 'string' ? body.preferences : undefined;
     const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
-      systemInstruction: getSystemPrompt(detectedScenario),
+      systemInstruction: getSystemPrompt(detectedScenario, preferences),
     });
 
     const userPrompt = query;
 
-    log.info('Calling Gemini', { query, scenario, model: MODEL_NAME, historyTurns: Array.isArray(history) ? history.length : 0 });
+    log.info('Calling Gemini', { query, scenario, model: MODEL_NAME, historyTurns: Array.isArray(history) ? history.length : 0, hasPreferences: !!preferences });
 
-    // Build multi-turn contents from conversation history
+    // Build multi-turn contents from conversation history (sliding window)
     const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
 
-    if (Array.isArray(history)) {
-      for (const turn of history) {
-        if (turn.role === 'user') {
-          contents.push({ role: 'user', parts: [{ text: turn.content }] });
-        } else if (turn.role === 'agent') {
-          contents.push({ role: 'model', parts: [{ text: turn.content }] });
-        }
+    const windowedHistory = trimConversationHistory(Array.isArray(history) ? history : []);
+    if (windowedHistory.length > 0) {
+      log.debug('History window applied', { original: Array.isArray(history) ? history.length : 0, windowed: windowedHistory.length });
+    }
+    for (const turn of windowedHistory) {
+      if (turn.role === 'user') {
+        contents.push({ role: 'user', parts: [{ text: turn.content }] });
+      } else if (turn.role === 'agent') {
+        contents.push({ role: 'model', parts: [{ text: turn.content }] });
       }
     }
 

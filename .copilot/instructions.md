@@ -8,7 +8,7 @@ This is a **demonstration project** showing how AI agents can render banking UI 
 
 - **Owner**: Ollie Macky, Principal Designer, Elevate Design System, NAB Melbourne
 - **Audience**: Elevate design system team, DS leadership, product leadership at NAB
-- **Design system**: Common Origin Design System v2.4 (`@common-origin/design-system`)
+- **Design system**: Common Origin Design System v2.8.2 (`@common-origin/design-system`)
 - **Strategic goal**: Demonstrate that patterns and design systems are critical for the future of banking UX
 
 ## Architecture

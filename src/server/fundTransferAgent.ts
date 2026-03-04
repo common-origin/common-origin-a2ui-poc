@@ -257,8 +257,13 @@ export async function streamFundTransferUI(
 ): Promise<void> {
   const messages = getFundTransferMessages();
 
+  const demoDelay = (ms: number): Promise<void> =>
+    process.env.NEXT_PUBLIC_DEMO_TIMING === 'true'
+      ? new Promise<void>((resolve) => setTimeout(resolve, ms))
+      : Promise.resolve();
+
   for (const message of messages) {
     onMessage(message);
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await demoDelay(100);
   }
 }

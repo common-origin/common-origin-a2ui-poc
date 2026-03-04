@@ -2,12 +2,75 @@
 
 > **Context**: This plan was developed by Ollie Macky (Principal Designer, Elevate Design System, NAB Melbourne) to demonstrate the strategic value of design system patterns for agentic banking experiences. The demo targets the Elevate design system team, design system leadership, and product leadership at NAB.
 
+## Phase 7 Progress Snapshot
+
+- Status: **Scaled back — pending strategic rethink (4 Mar 2026)**
+- Original implementation: `UserPreferences` type with theme/density/fontSize/reducedMotion/highContrast/persona fields, `loadPreferences`/`savePreferences` (localStorage), `buildPreferencesPromptBlock` injecting live context into agent system prompts, `PreferencesPanel` slide-in drawer, `SurfaceFeedback` thumbs-up/down widget, CSS variables for dark theme/density/font scale/high-contrast/reduced-motion.
+- **Decision**: The original implementation did not adequately convey the actual personalisation vision (see _Browsing Token Personalisation Vision_ below). The preferences code has been removed from the UI for now. A `Preferences` naked button is retained at top-right of the screen as a visual placeholder for the future hook point.
+- Test count: **282 tests passing** (unchanged — preferences unit tests remain; only UI wiring removed).
+- Next: Revisit personalisation once the browsing-token concept is clearer in scope, or proceed to Phase 8.
+
+## Phase 6.5 Progress Snapshot
+
+- Status: **Complete**
+- Completed: `PipelineTimer` class with 5 named stages (`submit → apiStart → firstMsg → firstRender → complete`), `trimConversationHistory` sliding-window utility, latency marks wired into `agentClient.ts` (`apiStart`, `firstMsg`, `complete`) and `app/page.tsx` (`submit`, `logReport`), `trimConversationHistory` applied in `agentClient.ts` and `app/api/agent/route.ts`, mock demo delays gated behind `NEXT_PUBLIC_DEMO_TIMING=true` in `mockAgent.ts`, `spendingSummaryAgent.ts`, and `fundTransferAgent.ts`, shell-first (rule 11) added to base prompt.
+- Test count: **266 tests passing** (up from 238).
+- Next: Phase 7 (personalisation).
+
+## Phase 6 Progress Snapshot (1 Mar 2026)
+
+- Status: **Complete**
+- Completed: Pattern type schema (`src/a2ui/patterns/types.ts`), 10 pattern definitions across 4 categories (`src/a2ui/patterns/definitions.ts`), pattern validator with detect/validate/state APIs (`src/a2ui/patterns/patternValidator.ts`), prompt block generator (`src/a2ui/patterns/patternPrompt.ts`), base prompt updated to include full pattern reference, all 6 scenario prompts annotated with their pattern IDs, 48 pattern tests.
+- Test count: **238 tests passing** (up from 190).
+- Next: Phase 6.5 (latency instrumentation) ✅ complete.
+
 ## Phase 3 Progress Snapshot (23 Feb 2026)
 
 - Status: **In progress**
 - Completed: Card image handling fix, action-format normalisation, CategoryBadge `label` standardisation, action follow-up loading state, page layout polish, targeted tests.
 - Deferred by decision: `A2UISurface` transition/skeleton/fade enhancements.
 - Remaining close-out: real Gemini walkthrough documentation + checklist sign-off + short reference recording.
+
+## Browsing Token Personalisation Vision
+
+> _Captured 4 March 2026 — strategic concept for a later phase, not currently implemented._
+
+The personalisation concept this project should eventually demonstrate is **not** a simple settings panel the user manually configures inside a banking app. That model is already the status quo, and it doesn't make a compelling case for the future.
+
+The real vision is a **user-owned, device-native browsing token** — an agnostic identity and preference layer that travels with the user across the internet, independent of any single website, app, or company. The user manages this token natively, perhaps through their phone's OS, a browser identity provider (like a future Google account layer), or a personal digital wallet. It is entirely theirs.
+
+The token holds browsing preference information such as:
+- **Accessibility**: font size / magnification preferences, colour-contrast profiles for specific types of colour blindness, reduced-motion settings, assistive technology configuration hints, preferred input modality (pointer, keyboard, voice)
+- **Display**: dark/light mode preference, density preference
+- **Identity**: first name, preferred language, locale/timezone — non-sensitive personal context that helps surfaces personalise communication tone and formatting
+- **Agent context**: interaction style preferences (verbose vs. concise), preferred level of confirmation before destructive actions
+
+When a user visits a website or opens an app, the site/app reads (with consent) the subset of the token it needs to adapt the experience. The user never has to re-configure preferences per-product. Crucially, this is **not controlled or stored by the enterprise** — it lives on the user's device or in a user-managed identity provider.
+
+### Why this matters for A2UI and agentic experiences
+
+In an agent-driven UX model, the agent can read the browsing token and make pattern decisions accordingly:
+- An accessibility-mode user gets high-contrast, larger-type, reduced-animation surfaces
+- A power-user persona gets denser, data-forward layouts with fewer confirmation steps
+- A screen-reader user gets components structured for AT compatibility from the first render
+
+This is where design system patterns become genuinely powerful: the token says _who the user is_, the agent selects _which pattern fits_, and the design system governs _how that pattern renders_.
+
+### Why this concept doesn't exist yet
+
+No browser or major enterprise platform currently supports an agnostic, user-owned preference token. The closest approximations are OS-level accessibility settings (which some browsers partially honour) and browser localStorage (which is per-origin and not portable). True cross-product, user-owned preference portability is an emerging area.
+
+For NAB and Elevate specifically, this framing is worth positioning ahead of the curve: **as the web moves toward agentic interfaces, design systems that govern pattern selection become the natural integration point for a future browsing token layer**. This applies across financial services but is especially compelling for assistive technology users, who currently must configure accessibility settings separately in every product they use.
+
+### What to build when revisiting this
+
+1. Mock the token as a browser-native object (e.g., a fictional `navigator.preferences` API surface) — make explicit it is a demo of a concept that does not yet exist
+2. Show the agent reading the token on first load and adapting the surface without any explicit user action
+3. Demonstrate a contrast: same query, two different token profiles, visibly different rendered output
+4. Frame the `Preferences` button in the UI as the "manage your token" entry point — not a per-app settings panel
+5. Highlight assistive technology users as the primary beneficiaries in any stakeholder presentation
+
+---
 
 ## Strategic Vision
 
@@ -37,7 +100,8 @@ This demo proves that thesis. It shows:
 - Real Gemini AI agent generating A2UI v0.9 messages streamed to the client
 - Message validation with DoS limits, catalog validation, URL sanitisation
 - Multi-turn conversation with action feedback loop (user clicks → agent responds)
-- 62 tests covering validation logic
+- **10 named banking patterns** across 4 categories (data-display, progressive-input, navigation, agentic) with typed definitions, a runtime validator, and prompt injection
+- 238 tests covering validation logic, rendering, bindings, voice routing, integration, and pattern compliance
 - Deployed on Vercel
 
 ### What Needs Improvement
@@ -140,10 +204,27 @@ This demo proves that thesis. It shows:
 ### Phase 5: Voice Input
 **Goal**: Add voice-to-text as an alternative input mode, demonstrating accessibility-first thinking.
 
+**Repo Implementation Checklist (1 Mar 2026)**:
+- [x] Voice-enabled input wired in [app/page.tsx](app/page.tsx) via `AgentInput` from DS v2.8.2 with local compat type wrapper; transcript routes through `onSubmit` → `handleSubmit`.
+- [x] `InputStage` layout: input centered in viewport on first load, collapses smoothly to top on first submit; `SurfaceContainer` animates in only after first submission.
+- [x] Simplified page shell: header, security banner, example chips, and agent mode toggle removed — input is the only thing visible at start.
+- [x] `speechError` state wired to `AgentInput.errorMessage` so voice errors surface inline.
+- [x] Browser compatibility and speech error mapping utilities in [src/lib/voiceInput.ts](src/lib/voiceInput.ts) with unit tests in [src/lib/voiceInput.test.ts](src/lib/voiceInput.test.ts).
+- [x] Catalog hardened for DS v2.8.2: `CategoryBadge` variant/color/size normalisation, `TransactionListItem` status/category allow-list, `StatusBadge` size clamping, `CardLarge` picture prop, catalog JSON and rules txt aligned.
+- [x] DS stakeholder brief added at [docs/a2ui-banking-stakeholder-brief.md](docs/a2ui-banking-stakeholder-brief.md).
+- [x] **DS team deliverable** — Animated circular gradient ring on mic button while listening (spec in [docs/agentic-input-component-spec.md](docs/agentic-input-component-spec.md), prompt in [docs/design-system-feedback.md](docs/design-system-feedback.md)).
+- [x] Expand voice-phrasing query coverage in [src/server/queryRouter.ts](src/server/queryRouter.ts) and add tests in [src/server/queryRouter.test.ts](src/server/queryRouter.test.ts) for spoken variants.
+- [x] Add integration coverage: mock `AgentInput.onSubmit` and verify `handleSubmit` receives transcript, sets `isGenerating`, and calls `callAgent`.
+- [ ] Run `pnpm test` to confirm green baseline after catalog changes, then one manual Chrome pass for permission-denied + no-speech-timeout UX.
+
+**Recommended Next Action**: Run one manual Chrome pass for permission-denied + no-speech-timeout UX, then proceed to Phase 6 (Pattern Definition Layer).
+
+**Phase 5 Status**: All automated checklist items complete. 190 tests passing. DS ring animation remains blocked on DS team delivery.
+
 **Steps**:
-1. Add a microphone button next to the text input. Use the Web Speech API (`webkitSpeechRecognition` / `SpeechRecognition`) — zero external dependencies, Chrome/Edge on desktop
-2. Visual feedback during listening — pulsing animation on mic button, interim transcript in the input field, clear start/stop states
-3. Graceful handling — browser compatibility check (show/hide mic button), permission denied handling, no-speech-detected timeout, manual stop button
+1. Add right-aligned microphone and send icon buttons inside the text input container. Use the Web Speech API (`webkitSpeechRecognition` / `SpeechRecognition`) — zero external dependencies, Chrome/Edge on desktop
+2. Visual feedback during listening — animated circular gradient border highlight around mic icon button (blue design-system token), interim transcript in the input field, clear start/stop states
+3. Graceful handling — browser compatibility check (show/hide mic icon button), permission denied handling, no-speech-detected timeout, manual stop button
 4. Test voice-transcribed queries against `analyzeQuery()` regex patterns — expand patterns if voice phrasing differs from typed queries
 5. Write tests for voice input integration (transcript → handleSubmit path, browser compat detection)
 
@@ -172,32 +253,32 @@ This demo proves that thesis. It shows:
 
 ---
 
-### Phase 6.5: Performance & Render Latency Optimisation (Post-Pattern Layer)
+### Phase 6.5: Performance & Render Latency Optimisation (Post-Pattern Layer) ✅
 **Goal**: Reduce time-to-first-render and time-to-interactive while preserving the A2UI protocol and pattern governance model.
 
 **Steps**:
-1. Add latency instrumentation across the full pipeline: submit → API start → model first byte → first valid A2UI message → first meaningful render
-2. Reduce runtime prompt weight by replacing verbose inline examples with compact pattern references established in Phase 6
-3. Limit conversation history sent per turn to only recent/relevant turns (sliding window)
-4. Introduce shell-first streaming guidance: agent sends minimal `createSurface` + lightweight initial components first, then detail batches
-5. Reduce render churn in the client by batching/coalescing rapid `updateComponents` bursts where possible
-6. Keep strict validation in development; use a lightweight production fast-path validation for streaming hot path if safe
-7. For mock mode, gate artificial delays behind a demo timing flag so performance testing can run without simulated wait
-8. Add regression tests/benchmarks for form interactivity latency and first-render timing targets
+1. ✅ Add latency instrumentation across the full pipeline: submit → API start → model first byte → first valid A2UI message → first meaningful render
+2. ✅ Reduce runtime prompt weight by replacing verbose inline examples with compact pattern references established in Phase 6
+3. ✅ Limit conversation history sent per turn to only recent/relevant turns (sliding window)
+4. ✅ Introduce shell-first streaming guidance: agent sends minimal `createSurface` + lightweight initial components first, then detail batches
+5. Reduce render churn in the client by batching/coalescing rapid `updateComponents` bursts where possible _(deferred)_
+6. Keep strict validation in development; use a lightweight production fast-path validation for streaming hot path if safe _(deferred)_
+7. ✅ For mock mode, gate artificial delays behind a demo timing flag so performance testing can run without simulated wait
+8. Add regression tests/benchmarks for form interactivity latency and first-render timing targets _(deferred)_
 
 **Outcome**: UI feels immediate while still fully A2UI-compliant. Performance improvements are measurable and repeatable.
 
 ---
 
-### Phase 7: Personalisation (Visual Demo)
+### Phase 7: Personalisation (Visual Demo) ✅
 **Goal**: Demonstrate how user context shapes the experience — preferences panel that visibly changes the UI.
 
 **Steps**:
-1. Create a user preferences panel (settings icon). Include: theme (light/dark), density (compact/comfortable/spacious), accessibility preferences (reduced motion, high contrast, font size), persona selector
-2. Wire preferences into the rendering layer — extend CSS custom properties for density, motion, font scaling
-3. Wire preferences into the system prompt — inject current preference state so the agent adapts pattern choices (e.g., compact list vs card layout based on density)
-4. Add a "Was this helpful?" interaction on each rendered surface to demonstrate the feedback concept
-5. Write tests for preference application
+1. ✅ Create a user preferences panel (settings icon). Include: theme (light/dark), density (compact/comfortable/spacious), accessibility preferences (reduced motion, high contrast, font size), persona selector
+2. ✅ Wire preferences into the rendering layer — extend CSS custom properties for density, motion, font scaling
+3. ✅ Wire preferences into the system prompt — inject current preference state so the agent adapts pattern choices (e.g., compact list vs card layout based on density)
+4. ✅ Add a "Was this helpful?" interaction on each rendered surface to demonstrate the feedback concept
+5. ✅ Write tests for preference application
 
 **Outcome**: Toggle preferences during a demo and see visible changes. Demonstrates the personalisation concept without a real token system.
 

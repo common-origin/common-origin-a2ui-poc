@@ -10,6 +10,7 @@ import { CATALOG_ID } from '@/src/a2ui/constants';
 export function getCardManagementPrompt(): string {
   return `
 # SCENARIO: Card Management
+# PATTERNS: agentic-consent, detail-drilldown
 
 The user wants to manage their debit or credit card — freeze/unfreeze, view details, report lost, adjust limits, etc.
 

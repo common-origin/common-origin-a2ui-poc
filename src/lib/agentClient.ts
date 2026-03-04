@@ -11,6 +11,8 @@ import { streamSpendingSummaryUI } from '@/src/server/spendingSummaryAgent';
 import { streamFundTransferUI } from '@/src/server/fundTransferAgent';
 import { createLogger, truncate } from '@/src/lib/logger';
 import { validateA2UIMessage } from '@/src/lib/messageValidator';
+import { pipelineTimer } from '@/src/lib/latencyTracker';
+import { trimConversationHistory } from '@/src/lib/conversationHistory';
 
 const log = createLogger('Agent');
 
@@ -38,17 +40,19 @@ export async function callRealAgent(
   query: string,
   onMessage: (message: A2UIMessage) => void,
   scenario?: string,
-  history?: ConversationTurn[]
+  history?: ConversationTurn[],
+  preferences?: string
 ): Promise<void> {
   let messageCount = 0;
 
   try {
     log.info('Calling API', { query: truncate(query, 80), scenario });
 
+    pipelineTimer.mark('apiStart');
     const response = await fetch('/api/agent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, scenario, history: history || [] }),
+      body: JSON.stringify({ query, scenario, history: trimConversationHistory(history || []), preferences }),
     });
 
     if (!response.ok) {
@@ -102,6 +106,7 @@ export async function callRealAgent(
             }
 
             messageCount++;
+            if (messageCount === 1) pipelineTimer.mark('firstMsg');
             const messageType = Object.keys(validation.message!)[0];
             log.debug(`Message ${messageCount}: ${messageType}`);
             onMessage(validation.message!);
@@ -141,6 +146,7 @@ export async function callRealAgent(
         }
       }
 
+      pipelineTimer.mark('complete');
       log.info('Completed', { totalMessages: messageCount });
 
       if (messageCount === 0) {
@@ -212,6 +218,7 @@ export async function callAgent(
     onError?: (error: Error) => void;  // Custom error handler
     retryOnError?: boolean;  // Retry with mock agent if real agent fails
     history?: ConversationTurn[];  // Conversation history for multi-turn
+    preferences?: string;  // Serialised user-preferences block for system prompt
   }
 ): Promise<void> {
   const mode = options?.forceMode || AGENT_MODE;
@@ -219,9 +226,10 @@ export async function callAgent(
 
   try {
     const history = options?.history;
+    const preferences = options?.preferences;
     if (mode === 'real') {
       log.info('Using real Gemini agent', { query: truncate(query, 60), scenario, historyLength: history?.length || 0 });
-      await callRealAgent(query, onMessage, scenario, history);
+      await callRealAgent(query, onMessage, scenario, history, preferences);
     } else {
       log.info('Using mock agent', { query: truncate(query, 60), scenario });
       await callMockAgent(query, onMessage, scenario, history);

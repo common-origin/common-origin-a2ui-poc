@@ -9,9 +9,6 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     // Tests that need jsdom use the // @vitest-environment jsdom directive
-    environmentMatchGlobs: [
-      ['src/**/*.render.test.tsx', 'jsdom'],
-    ],
     setupFiles: ['./src/test-setup.ts'],
     // Inline DS deps so Vite resolves React/styled-components through our aliases
     deps: {

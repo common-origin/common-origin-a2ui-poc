@@ -278,8 +278,15 @@ export async function streamTransactionFinderUI(
   onMessage: (message: A2UIMessage) => void,
   showEmptyState: boolean = false,
 ): Promise<void> {
+  // Gate demo delays behind NEXT_PUBLIC_DEMO_TIMING=true so tests and
+  // performance benchmarks run at full speed without artificial waits.
+  const demoDelay = (ms: number): Promise<void> =>
+    process.env.NEXT_PUBLIC_DEMO_TIMING === 'true'
+      ? new Promise<void>((resolve) => setTimeout(resolve, ms))
+      : Promise.resolve();
+
   const sendWithDelay = async (messages: A2UIMessage[], delay: number) => {
-    await new Promise((resolve) => setTimeout(resolve, delay));
+    await demoDelay(delay);
     messages.forEach(onMessage);
   };
 

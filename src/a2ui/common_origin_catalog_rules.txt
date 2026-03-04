@@ -15,10 +15,10 @@
 - For 'ListItem', you MUST provide 'primary' (the primary text).
 - For 'DateGroup', you MUST provide 'date' and 'children'.
 - For 'MoneyDisplay', you MUST provide 'amount' (a number). Defaults: currency=AUD, locale=en-AU.
-- For 'TransactionListItem', you MUST provide 'merchant', 'amount', and 'date'. The 'status' should be one of: completed, pending, failed, cancelled, processing, refunded. The 'category' should be one of: shopping, dining, transport, entertainment, bills, health, education, other.
+- For 'TransactionListItem', you MUST provide 'merchant', 'amount', and 'date'. The 'status' should be one of: completed, pending, failed. The 'category' should be one of: shopping, dining, transport, entertainment, bills, other.
 - For 'AccountCard', you MUST provide 'accountName' and 'balance'. The 'accountType' should be one of: everyday, savings, credit, mortgage, term-deposit.
 - For 'CategoryBadge', you MUST provide 'label'. Do not use 'content'.
-- For 'StatusBadge', you MUST provide 'status' (same values as TransactionListItem).
+- For 'StatusBadge', you MUST provide 'status'. Supported values: pending, completed, failed, cancelled, processing, scheduled.
 - For 'TabBar', you MUST provide 'tabs' (array of {id, label}).
 - For 'ActionSheet', you MUST provide 'actions' (array of {id, label}).
 - For 'Progress', you MUST provide 'value' (0-100).
@@ -36,3 +36,17 @@
 - Use { "path": "/field" } inside context values when you need runtime data-model resolution.
 - For list-style interactive components (for example ListItem, TransactionListItem), use 'onClick' with the same v0.9 shape: { "name": "actionName", "context": [...] }.
 - For form controls (TextField, NumberField, Select, Checkbox), use local onChange with 'eventType' + 'dataPath' to update the local data model.
+
+**PATTERNS:**
+Use the following named patterns to structure your UI. Each pattern defines required components, layout rules, and interaction flows.
+
+- account-summary: Requires AccountCard + Stack. Show a MoneyDisplay total. Each AccountCard must have an onClick action.
+- transaction-list: When showing results, EVERY TransactionListItem must be wrapped in a DateGroup and have an onClick "view_transaction" action. Show EmptyState when there are no results.
+- spending-breakdown: Requires CategoryBadge + MoneyDisplay + Stack. List categories highest-spend first with a MoneyDisplay per category.
+- progressive-input: Requires at least one of TextField, NumberField, Select, or Checkbox, plus a primary Button to advance the flow. Always include a cancel/back Button.
+- confirmation-flow: Three states — review (summary Card + confirm Button + edit Button), success (Alert + reference number), error (Alert + retry Button).
+- search-and-filter: Requires SearchField at the top. Use BooleanChip for filters. Show EmptyState with illustration="search" when no results.
+- detail-drilldown: Detail view must have a back Button (action "back_to_list") and wrap content in a Card.
+- disambiguation: Show a Text question + two or more Button options when user intent is ambiguous.
+- progressive-disclosure: Use when you need one piece of additional context — brief Alert/Text explaining what's needed, 2-3 Button options.
+- agentic-consent: Required for destructive actions — warning Alert + confirm Button + cancel Button (cancel must never be styled as 'text' variant).

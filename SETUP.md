@@ -83,7 +83,7 @@ vendor/a2ui/                   # Vendored A2UI specification (reference only)
 
 ## Design System Dependency
 
-This project depends on `@common-origin/design-system` (^2.4.0). The design system provides the actual React components that the A2UI catalog maps to. Ensure you have access to the Common Origin npm registry.
+This project depends on `@common-origin/design-system` (^2.8.2). The design system provides the actual React components that the A2UI catalog maps to. Ensure you have access to the Common Origin npm registry.
 
 ## Troubleshooting
 

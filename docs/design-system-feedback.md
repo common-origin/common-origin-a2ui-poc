@@ -17,6 +17,53 @@ When a gap is identified between what this demo needs and what the DS provides:
 
 ## Entries
 
+### 2026-03-01 — AgentInput: Voice-Active Animated Gradient Ring
+
+**Need**: Strong, immediate visual feedback that voice capture is actively listening.
+
+**Current DS State**: `AgentInput` supports voice interactions and state callbacks, but the listening state feedback does not yet require a distinct animated circular border treatment around the mic icon button.
+
+**Gap**: During listening, users need an unmistakable active-state affordance beyond text/status alone. Current guidance is not specific enough to guarantee a consistent, premium interaction pattern.
+
+**Impact**: Voice state can feel ambiguous, reducing confidence and increasing stop/start errors during demos and real usage. This weakens accessibility and discoverability of active capture state.
+
+**Affected Files**: [docs/agentic-input-component-spec.md](docs/agentic-input-component-spec.md), [app/page.tsx](app/page.tsx)
+
+#### Prompt for DS Project
+
+> **Enhancement Request: AgentInput — Listening State Animated Circular Gradient Ring on Mic Button**
+>
+> Please add a first-class listening-state visual treatment for `AgentInput` voice capture:
+>
+> **Requested behavior**
+> - When voice listening is active, show an animated circular gradient ring around the mic icon button.
+> - The ring should appear to travel/rotate around the button perimeter and be clearly distinct from idle state.
+> - The ring must be removed immediately when listening stops, errors, or submit begins.
+>
+> **Design/token constraints**
+> - Use design-system blue token family only (no hard-coded color values).
+> - Keep the treatment token-driven and theme-compatible.
+> - Preserve layout stability: no control-cluster shift, no icon-size jump.
+>
+> **Accessibility requirements**
+> - Respect reduced-motion: replace animation with static blue ring while retaining listening text/status semantics.
+> - Ensure listening vs idle remains distinguishable without relying only on motion or color.
+> - Keep keyboard/screen-reader behavior unchanged (`aria-pressed`, labels, live status updates).
+>
+> **Suggested API/implementation shape**
+> - Internal state-driven visual style is acceptable (no new prop required), but if needed expose a minimal variant hook for custom theming.
+> - Add Storybook examples: idle, listening (animated), listening (reduced motion), error, submitting.
+>
+> **Acceptance criteria**
+> 1. Listening state renders animated circular blue gradient ring around mic button.
+> 2. Reduced-motion renders static ring instead of animation.
+> 3. No layout shift when toggling idle/listening.
+> 4. No regressions in voice start/stop and send flows.
+>
+> **Priority**: High — core UX feedback for voice capture in agentic input.
+
+---
+
 ### 2026-02-22 — AccountCard: Missing `'everyday'` Account Type
 
 **Need**: Australian banking uses "Everyday" accounts, not "Checking" accounts.

@@ -640,7 +640,7 @@ export function renderNode(
         const isOutlined = node.variant === 'outlined';
         const isFilled = node.variant === 'filled';
         const containerChildren = title
-          ? [React.createElement(Typography, { key: `${id}-title`, variant: 'h3' }, title), ...childElements]
+          ? [React.createElement(Typography, { key: `${id}-title`, variant: 'h3', children: title }), ...childElements]
           : childElements;
         return React.createElement(Box, {
           key: id,
@@ -652,21 +652,17 @@ export function renderNode(
       }
 
       // Card without children → use CardLarge (for media/summary cards)
-      const cardProps: Record<string, unknown> = {
-        key: id,
+      const image = node.image ? resolveBinding(node.image as StringOrPath, dm) : '';
+      const sanitizedImage = image ? sanitizeUrl(image) : '';
+      const cardProps: React.ComponentProps<typeof CardLarge> = {
         title: title || '',
         excerpt,
+        picture: sanitizedImage || '',
         subtitle,
         labels: node.labels as string[],
       };
 
-      const image = node.image ? resolveBinding(node.image as StringOrPath, dm) : '';
-      const sanitizedImage = image ? sanitizeUrl(image) : '';
-      if (sanitizedImage) {
-        cardProps.picture = sanitizedImage;
-      }
-
-      return React.createElement(CardLarge, cardProps);
+      return React.createElement(CardLarge, { key: id, ...cardProps });
     }
 
     case 'List': {
@@ -700,7 +696,8 @@ export function renderNode(
       const dateValue = resolveBinding(node.date as StringOrPath, dm);
       const visibleTxNodes = (childIds as string[])
         .map((childId) => surface.components.get(childId))
-        .filter((child): child is ComponentNode => Boolean(child) && child.component === 'TransactionListItem')
+        .filter((child): child is ComponentNode => Boolean(child))
+        .filter((child) => child.component === 'TransactionListItem')
         .filter((child) => isTransactionVisible(child, dm));
 
       const hasTransactionChildren = visibleTxNodes.length > 0;
@@ -774,14 +771,19 @@ export function renderNode(
         // Legacy format: pass through as-is
         handleClick = () => onAction?.(onClick);
       }
+
+      const VALID_TX_STATUSES = ['completed', 'pending', 'failed'];
+      const status = VALID_TX_STATUSES.includes(node.status) ? node.status : undefined;
+      const VALID_TX_CATEGORIES = ['shopping', 'dining', 'transport', 'entertainment', 'bills', 'other'];
+      const category = VALID_TX_CATEGORIES.includes(node.category) ? node.category : undefined;
       
       return React.createElement(TransactionListItem, {
         key: id,
         merchant,
         amount,
         date,
-        status: node.status,
-        category: node.category,
+        status,
+        category,
         merchantLogo: node.merchantLogo ? sanitizeUrl(node.merchantLogo) : undefined,
         description,
         hasReceipt: node.hasReceipt,
@@ -836,14 +838,26 @@ export function renderNode(
 
     case 'CategoryBadge': {
       const text = resolveBinding(node.label as StringOrPath, dm);
+      const VALID_COLORS = ['blue', 'purple', 'pink', 'yellow', 'green', 'red', 'orange', 'gray'];
+      const rawColor = node.color === 'grey' ? 'gray' : node.color;
+      const color = VALID_COLORS.includes(rawColor) ? rawColor : 'blue';
+
+      const variantMap: Record<string, string> = {
+        outline: 'outlined',
+        subtle: 'minimal',
+      };
+      const rawVariant = variantMap[node.variant] || node.variant;
+      const VALID_VARIANTS = ['filled', 'outlined', 'minimal'];
+      const variant = VALID_VARIANTS.includes(rawVariant) ? rawVariant : 'filled';
+
+      const size = node.size === 'small' ? 'small' : 'medium';
+
       return React.createElement(CategoryBadge, {
         key: id,
-        color: node.color || 'blue',
-        variant: node.variant || 'filled',
-        size: node.size || 'medium',
+        color,
+        variant,
+        size,
         icon: node.icon as any,
-        onClick: node.onClick ? () => onAction?.(node.onClick) : undefined,
-        disabled: node.disabled || false,
         children: text,
       });
     }
@@ -856,7 +870,7 @@ export function renderNode(
         key: id,
         status,
         label,
-        size: node.size || 'medium',
+        size: node.size === 'small' ? 'small' : 'medium',
         showIcon: node.showIcon !== false,
         liveRegion: node.liveRegion !== false,
       });
@@ -988,7 +1002,7 @@ export function isValidComponent(component: unknown): boolean {
 export function getCatalogMetadata() {
   return {
     catalogId: CATALOG_ID,
-    version: '2.4',
+    version: '2.8.2',
     components: [
       { name: 'Text', description: 'Render text with typography variants' },
       { name: 'Button', description: 'Interactive button with variants' },

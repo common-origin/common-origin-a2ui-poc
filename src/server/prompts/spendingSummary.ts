@@ -10,6 +10,7 @@ import { CATALOG_ID } from '@/src/a2ui/constants';
 export function getSpendingSummaryPrompt(): string {
   return `
 # SCENARIO: Spending Summary / Analytics
+# PATTERNS: spending-breakdown
 
 The user wants to see their spending breakdown, summary, or analytics.
 

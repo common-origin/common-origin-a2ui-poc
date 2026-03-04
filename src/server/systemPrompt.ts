@@ -30,10 +30,12 @@ const scenarioPrompts: Record<ScenarioType, () => string> = {
  * Get the composed system prompt for a given scenario.
  *
  * @param scenario - The detected scenario type. Defaults to 'unknown' (full catalog).
- * @returns Combined base + scenario prompt string
+ * @param preferences - Optional pre-built preferences block to append.
+ * @returns Combined base + scenario + (optional) preferences prompt string
  */
-export function getSystemPrompt(scenario: ScenarioType = 'unknown'): string {
+export function getSystemPrompt(scenario: ScenarioType = 'unknown', preferences?: string): string {
   const base = getBasePrompt();
   const scenarioPrompt = scenarioPrompts[scenario]();
-  return `${base}\n${scenarioPrompt}`;
+  const prefsBlock = preferences ? `\n${preferences}` : '';
+  return `${base}\n${scenarioPrompt}${prefsBlock}`;
 }

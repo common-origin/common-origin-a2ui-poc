@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "common-origin.design-system:v2.4/catalog_definition.json",
+  "$id": "common-origin.design-system:v2.8.2/catalog_definition.json",
   "title": "Common Origin Design System – A2UI Component Catalog",
-  "description": "Custom A2UI catalog definition for the Common Origin Design System v2.4. Defines all permitted component types, their required/optional properties, and allowed values.",
+  "description": "Custom A2UI catalog definition for the Common Origin Design System v2.8.2. Defines all permitted component types, their required/optional properties, and allowed values.",
   "$defs": {
     "stringOrPath": {
       "description": "A literal string or a data-binding path.",
@@ -553,11 +553,11 @@
         "date": { "$ref": "#/$defs/stringOrPath", "description": "ISO date string." },
         "status": {
           "type": "string",
-          "enum": ["completed", "pending", "failed", "cancelled", "processing", "refunded"]
+          "enum": ["completed", "pending", "failed"]
         },
         "category": {
           "type": "string",
-          "enum": ["shopping", "dining", "transport", "entertainment", "bills", "health", "education", "income", "other"]
+          "enum": ["shopping", "dining", "transport", "entertainment", "bills", "other"]
         },
         "merchantLogo": { "type": "string", "description": "URL to merchant logo image." },
         "description": { "$ref": "#/$defs/stringOrPath" },
@@ -624,19 +624,17 @@
         "label": { "$ref": "#/$defs/stringOrPath", "description": "Badge text." },
         "color": {
           "type": "string",
-          "enum": ["blue", "green", "red", "orange", "purple", "teal", "pink", "grey"]
+          "enum": ["blue", "purple", "pink", "yellow", "green", "red", "orange", "gray"]
         },
         "variant": {
           "type": "string",
-          "enum": ["filled", "outline", "subtle"]
+          "enum": ["filled", "outlined", "minimal"]
         },
         "size": {
           "type": "string",
-          "enum": ["small", "medium", "large"]
+          "enum": ["small", "medium"]
         },
-        "icon": { "type": "string" },
-        "onClick": { "$ref": "#/$defs/actionObject" },
-        "disabled": { "type": "boolean" }
+        "icon": { "type": "string" }
       },
       "required": ["id", "component", "label"],
       "additionalProperties": false
@@ -650,12 +648,12 @@
         "component": { "const": "StatusBadge" },
         "status": {
           "type": "string",
-          "enum": ["completed", "pending", "failed", "cancelled", "processing", "refunded"]
+          "enum": ["completed", "pending", "failed", "cancelled", "processing", "scheduled"]
         },
         "label": { "$ref": "#/$defs/stringOrPath" },
         "size": {
           "type": "string",
-          "enum": ["small", "medium", "large"]
+          "enum": ["small", "medium"]
         },
         "showIcon": { "type": "boolean" },
         "liveRegion": { "type": "boolean" }

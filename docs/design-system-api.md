@@ -1,6 +1,6 @@
 # Common Origin Design System — Component API Reference
 
-> **Auto-generated from `@common-origin/design-system` v2.4.0 type definitions.**
+> **Auto-generated from `@common-origin/design-system` v2.8.2 type definitions.**
 > Regenerate this file when the DS version is bumped by reading `.d.ts` files from `node_modules/@common-origin/design-system/dist/`.
 
 ---

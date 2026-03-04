@@ -10,6 +10,7 @@ import { CATALOG_ID } from '@/src/a2ui/constants';
 export function getBillPaymentPrompt(): string {
   return `
 # SCENARIO: Bill Payment / BPAY
+# PATTERNS: progressive-input, confirmation-flow
 
 The user wants to pay a bill, make a BPAY payment, or manage scheduled payments.
 

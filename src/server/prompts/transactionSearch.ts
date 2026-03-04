@@ -11,6 +11,7 @@ import { CATALOG_ID } from '@/src/a2ui/constants';
 export function getTransactionSearchPrompt(): string {
   return `
 # SCENARIO: Transaction Search
+# PATTERNS: transaction-list, search-and-filter, detail-drilldown
 
 The user wants to find, search, or filter their transactions.
 

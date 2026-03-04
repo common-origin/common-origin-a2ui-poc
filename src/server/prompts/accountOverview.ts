@@ -10,6 +10,7 @@ import { CATALOG_ID } from '@/src/a2ui/constants';
 export function getAccountOverviewPrompt(): string {
   return `
 # SCENARIO: Account Overview / Dashboard
+# PATTERNS: account-summary, detail-drilldown
 
 The user wants to see their accounts, balances, or an overview of their financial position.
 
