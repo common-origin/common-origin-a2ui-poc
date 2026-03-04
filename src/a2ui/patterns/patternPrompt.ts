@@ -11,6 +11,7 @@
  */
 
 import { ALL_PATTERNS, getPatternsByCategory, getPatternsForScenario } from './definitions';
+import { GLOBAL_RHYTHM_RULES } from './rhythmRules';
 import type { PatternDefinition } from './types';
 
 // ---------------------------------------------------------------------------
@@ -101,6 +102,41 @@ export function getPatternCheatSheet(): string {
     (p) => `• ${p.id}: requires ${p.requiredComponents.join(', ')}`
   );
   return `# PATTERN QUICK REFERENCE\n${lines.join('\n')}`;
+}
+
+/**
+ * Visual rhythm rules block — a compact agent-readable summary of the
+ * cross-cutting layout consistency rules that apply to EVERY surface.
+ *
+ * Injected into the base system prompt so the agent always knows the
+ * visual grammar regardless of which pattern is active.
+ *
+ * Token budget: ~200 tokens.
+ */
+export function getRhythmRulesBlock(): string {
+  const ruleLines = GLOBAL_RHYTHM_RULES.map((r) => `- **${r.id}**: ${r.description}.`).join('\n');
+  return `# VISUAL RHYTHM RULES
+
+The following layout rules apply to EVERY surface you generate, across all patterns.
+They ensure a consistent visual rhythm — equal spacing, predictable element order,
+and uniform sizing so the UI feels coherent regardless of which scenario is rendered.
+
+${ruleLines}
+
+## Spacing tokens (use these values for gap/spacing props)
+- \`"xs"\`  — 4 px  — icon rows, inline chip groups
+- \`"sm"\`  — 8 px  — tight label/value pairs, button rows
+- \`"md"\` — 16 px  — form fields, card sections ← default for forms
+- \`"lg"\` — 24 px  — between logical sections on a page
+- \`"xl"\` — 32 px  — top-level full-page sections
+
+## Quick checklist for every surface
+1. Every Stack → add \`gap\` prop (use \`"md"\` if unsure).
+2. Form fields → Stack with \`direction="column"\` and \`gap="md"\`.
+3. Filter chips → Stack with \`direction="row"\` and \`gap="xs"\`.
+4. Button pairs → secondary/cancel first, primary/confirm last, same \`size\`.
+5. Page structure → heading Text always the first child of its Stack.
+6. Input fields → always inside a Stack, never at root level.`;
 }
 
 // ---------------------------------------------------------------------------

@@ -3,10 +3,25 @@
  *
  * Core protocol rules shared by all scenario prompts.
  * This is the foundation that every Gemini call includes.
+ *
+ * Catalog rules are read from:
+ *   src/a2ui/common_origin_catalog_rules.txt
+ *
+ * That file is the spec-native extension point for Common Origin's custom
+ * catalog — one source of truth for required props, visual rhythm rules,
+ * pattern guidance, and action conventions. Edit it there; this prompt
+ * injects it verbatim.
  */
 
 import { CATALOG_ID } from '@/src/a2ui/constants';
-import { getPatternReferenceBlock } from '@/src/a2ui/patterns';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+/** Read the catalog rules file once at module load time (server-side only). */
+const CATALOG_RULES = readFileSync(
+  join(process.cwd(), 'src/a2ui/common_origin_catalog_rules.txt'),
+  'utf-8'
+);
 
 export function getBasePrompt(): string {
   return `You are a banking UI generation agent that creates declarative user interfaces using the A2UI (Agent to UI) protocol v0.9.
@@ -97,6 +112,8 @@ IMPORTANT: Always generate a complete new UI starting with createSurface when ha
 10. When handling a user action, generate a complete new UI for the next step
 11. Shell-first: immediately after createSurface, send one updateComponents with ONLY the root Stack + header Text; then send detailed components in subsequent messages — this minimises time-to-first-paint for the user
 
-${getPatternReferenceBlock()}
+# CATALOG RULES
+
+${CATALOG_RULES}
 `;
 }

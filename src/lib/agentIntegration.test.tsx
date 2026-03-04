@@ -68,8 +68,7 @@ vi.mock('@common-origin/design-system', () => ({
 
 // ── Mock: agentClient ─────────────────────────────────────────────────────
 const mockCallAgent = vi.fn<
-  [string, (msg: unknown) => void, string | undefined, Record<string, unknown>],
-  Promise<void>
+  (msg: string, onChunk: (msg: unknown) => void, scenario: string | undefined, context: Record<string, unknown>) => Promise<void>
 >();
 
 vi.mock('@/src/lib/agentClient', () => ({

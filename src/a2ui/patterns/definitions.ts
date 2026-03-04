@@ -12,7 +12,70 @@
  * pattern validator can check surface compliance at runtime.
  */
 
-import type { PatternDefinition } from './types';
+import type { PatternDefinition, RhythmRule } from './types';
+
+// ---------------------------------------------------------------------------
+// Shared per-pattern rhythm rule helpers (supplement the global rules)
+// ---------------------------------------------------------------------------
+
+/** Form stacks must use direction="column" — horizontal form layouts break rhythm. */
+const formStackColumnRule: RhythmRule = {
+  id: 'form-stack-column',
+  description: 'Form Stacks containing input fields must use direction="column" (vertical layout)',
+  check: (nodes, ctx) => {
+    const INPUT_TYPES = new Set(['TextField', 'NumberField', 'Select', 'Checkbox', 'DateField']);
+    const violations: string[] = [];
+    for (const node of nodes) {
+      if (node.component !== 'Stack') continue;
+      const hasInputs = ctx.childrenOf(node.id).some((c) => INPUT_TYPES.has(c.component));
+      if (hasInputs && node.direction === 'row') {
+        violations.push(
+          `Form Stack "${node.id}" uses direction="row" — input fields require direction="column"`
+        );
+      }
+    }
+    return violations;
+  },
+};
+
+/** Filter chip rows must use direction="row" so chips wrap horizontally. */
+const filterChipsRowRule: RhythmRule = {
+  id: 'filter-chips-row',
+  description: 'Stacks containing BooleanChip / FilterChip must use direction="row" for horizontal chip flow',
+  check: (nodes, ctx) => {
+    const CHIP_TYPES = new Set(['BooleanChip', 'FilterChip', 'Chip']);
+    const violations: string[] = [];
+    for (const node of nodes) {
+      if (node.component !== 'Stack') continue;
+      const hasChips = ctx.childrenOf(node.id).some((c) => CHIP_TYPES.has(c.component));
+      if (hasChips && node.direction !== 'row') {
+        violations.push(
+          `Chip Stack "${node.id}" should use direction="row" so filter chips flow horizontally`
+        );
+      }
+    }
+    return violations;
+  },
+};
+
+/** Disambiguation option Buttons must each be in their own row (direction=column). */
+const disambiguationColumnRule: RhythmRule = {
+  id: 'disambiguation-column',
+  description: 'Option Buttons in disambiguation patterns must be in a column Stack (not row)',
+  check: (nodes, ctx) => {
+    const violations: string[] = [];
+    for (const node of nodes) {
+      if (node.component !== 'Stack') continue;
+      const buttonChildren = ctx.childrenOf(node.id).filter((c) => c.component === 'Button');
+      if (buttonChildren.length >= 2 && node.direction === 'row') {
+        violations.push(
+          `Disambiguation Stack "${node.id}" uses direction="row" — option Buttons must stack vertically (direction="column") so each option is a full-width tap target`
+        );
+      }
+    }
+    return violations;
+  },
+};
 
 // ── Data Display Patterns ───────────────────────────────────────────────────
 
@@ -35,7 +98,8 @@ const accountSummary: PatternDefinition = {
   ],
   agentGuidance:
     'Use AccountCard for each account. Show a MoneyDisplay total at the top. ' +
-    'Place quick-action Buttons (Transfer, View spending, Search) at the bottom. ' +
+    'Place quick-action Buttons (Transfer, View spending, Search) at the bottom in a Stack with gap="sm" and direction="row". ' +
+    'All Buttons in the action row must share the same size prop. ' +
     'If a credit card payment is due, show a warning Alert.',
   usedBy: ['account-overview'],
 };
@@ -103,6 +167,7 @@ const spendingBreakdown: PatternDefinition = {
   agentGuidance:
     'Show a total spend MoneyDisplay at the top. List each category with a CategoryBadge ' +
     'plus a MoneyDisplay and optional Progress bar showing percentage of total. ' +
+    'Wrap the category list in a Stack with gap="md". ' +
     'Order categories by spend amount (highest first). ' +
     'Include a comparison Alert if spend is unusual vs prior period.',
   usedBy: ['spending-summary'],
@@ -143,12 +208,14 @@ const progressiveInput: PatternDefinition = {
       check: (types) => types.includes('Button'),
     },
   ],
+  rhythmRules: [formStackColumnRule],
   agentGuidance:
     'Show only the fields needed for the current step. ' +
-    'The primary Button\'s action name should clearly describe what advances the flow ' +
-    '(e.g. "review_transfer", "confirm_payment"). ' +
-    'Always include a cancel/back Button with variant "secondary". ' +
-    'Use an Alert to show any constraints (e.g. available balance).',
+    'Wrap all input fields in a Stack with direction="column" and gap="md" — never lay out inputs side-by-side. ' +
+    'Place ALL Buttons after ALL inputs at the bottom of the form Stack. ' +
+    'The primary Button (e.g. "Continue", "Review") must be last; the secondary cancel/back Button comes before it. ' +
+    'Both Buttons must use the same size prop. ' +
+    'Use an Alert above the inputs to show any constraints (e.g. available balance).',
   usedBy: ['fund-transfer', 'bill-payment'],
 };
 
@@ -188,8 +255,11 @@ const confirmationFlow: PatternDefinition = {
     },
   ],
   agentGuidance:
-    'REVIEW: Show a summary Card with all details. Confirm Button action = "confirm_<action>". ' +
-    'Edit Button action = "back_to_form". ' +
+    'REVIEW: Show a summary Card with all details. ' +
+    'Action Buttons come AFTER the Card — never before it. ' +
+    'Wrap the Button pair in a Stack with gap="sm" and direction="row"; ' +
+    'secondary "Back" Button first, primary "Confirm" Button last. ' +
+    'Both Buttons must use the same size. ' +
     'SUCCESS: Show a success Alert with the completed detail, a reference number (REF-YYYYMMDD-xxxx), ' +
     'and "Make another" + "View account" Buttons. ' +
     'ERROR: Show an error Alert with a plain-language explanation and a retry Button.',
@@ -231,8 +301,9 @@ const searchAndFilter: PatternDefinition = {
       check: (types) => types.includes('TransactionListItem') || types.includes('EmptyState'),
     },
   ],
+  rhythmRules: [filterChipsRowRule],
   agentGuidance:
-    'Place SearchField at the top. Place BooleanChip filter chips in a horizontal Stack below. ' +
+    'Place SearchField at the top. Place BooleanChip filter chips in a Stack with direction="row" and gap="xs" below. ' +
     'Bind SearchField and each chip to the data model with onChange + dataPath. ' +
     'Show EmptyState with illustration="search" when no results match. ' +
     'Include a result count summary (e.g. "5 results") below the filters.',
@@ -295,10 +366,12 @@ const disambiguation: PatternDefinition = {
       check: (types) => types.includes('Button'),
     },
   ],
+  rhythmRules: [disambiguationColumnRule],
   agentGuidance:
     'Use when the query could mean more than one thing (e.g. "pay James" with multiple payees). ' +
     'Show a Text question ("Which account did you mean?"). ' +
-    'Render each option as a distinct Button in a column Stack. ' +
+    'Render each option as a distinct full-width Button in a Stack with direction="column" and gap="sm". ' +
+    'Never put option Buttons side-by-side in a row. ' +
     'Each Button action should carry enough context to proceed without re-asking.',
   usedBy: ['unknown'],
 };

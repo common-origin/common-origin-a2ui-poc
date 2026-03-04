@@ -51,7 +51,7 @@ She is based in Melbourne, Australia. Use realistic AUD amounts and Australian m
 - SearchField: {"id":"x","component":"SearchField","value":{"path":"/query"},"onChange":{"eventType":"change","dataPath":"query"},"placeholder":"Search..."}
 
 ## Actions & Navigation
-- Button: {"id":"x","component":"Button","label":"Label","variant":"primary"|"secondary"|"text","action":{"name":"action_name","context":[{"key":"field","value":"value"}]}}
+- Button: {"id":"x","component":"Button","label":"Label","variant":"primary"|"secondary"|"naked","action":{"name":"action_name","context":[{"key":"field","value":"value"}]}}
 - BooleanChip: {"id":"x","component":"BooleanChip","content":"Label","selected":true|false}
 - TabBar: {"id":"x","component":"TabBar","tabs":[{"label":"Tab1","value":"tab1"},{"label":"Tab2","value":"tab2"}],"activeTab":{"path":"/activeTab"},"onChange":{"eventType":"change","dataPath":"activeTab"}}
 

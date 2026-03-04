@@ -14,22 +14,90 @@
 import type { A2UIMessage } from '../a2ui/types';
 import { CATALOG_ID } from '../a2ui/constants';
 
+function getRelativeISODate(daysAgo: number): string {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() - daysAgo);
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+type MockTransactionSeed = {
+  merchant: string;
+  daysAgo: number;
+  amount: number;
+  category: 'shopping' | 'dining' | 'transport' | 'entertainment' | 'bills' | 'other';
+  status: 'completed' | 'pending' | 'failed';
+};
+
 /**
  * Transaction data for demo - Australian retailers & realistic banking data
  * Consistent with Sarah Chen's Everyday Account (••••7890)
  */
-const MOCK_TRANSACTIONS = [
-  { id: 'tx1', merchant: 'Woolworths Metro CBD', date: '2026-02-18', amount: -87.43, category: 'shopping', status: 'completed' },
-  { id: 'tx2', merchant: 'The Coffee Club', date: '2026-02-18', amount: -8.50, category: 'dining', status: 'completed' },
-  { id: 'tx3', merchant: 'Uber Eats', date: '2026-02-18', amount: -27.24, category: 'dining', status: 'pending' },
-  { id: 'tx4', merchant: 'Caltex Epping', date: '2026-02-17', amount: -65.00, category: 'transport', status: 'completed' },
-  { id: 'tx5', merchant: 'Netflix Australia', date: '2026-02-15', amount: -22.99, category: 'entertainment', status: 'completed' },
-  { id: 'tx6', merchant: 'AGL Energy', date: '2026-02-15', amount: -189.00, category: 'bills', status: 'completed' },
-  { id: 'tx7', merchant: 'Kmart Doncaster', date: '2026-02-14', amount: -42.36, category: 'shopping', status: 'completed' },
-  { id: 'tx8', merchant: 'Woolworths Doncaster', date: '2026-02-14', amount: -67.20, category: 'shopping', status: 'completed' },
-  { id: 'tx9', merchant: 'Bunnings Warehouse', date: '2026-02-12', amount: -127.85, category: 'shopping', status: 'completed' },
-  { id: 'tx10', merchant: 'JB Hi-Fi', date: '2026-02-10', amount: -299.00, category: 'shopping', status: 'pending' },
+const MOCK_TRANSACTION_SEED: MockTransactionSeed[] = [
+  { merchant: 'Woolworths Metro CBD', daysAgo: 0, amount: -92.15, category: 'shopping', status: 'completed' },
+  { merchant: 'The Coffee Club', daysAgo: 0, amount: -9.20, category: 'dining', status: 'completed' },
+  { merchant: 'Uber Eats', daysAgo: 1, amount: -31.60, category: 'dining', status: 'pending' },
+  { merchant: 'Myki Top Up', daysAgo: 1, amount: -25.00, category: 'transport', status: 'completed' },
+  { merchant: 'Coles Fitzroy', daysAgo: 2, amount: -76.40, category: 'shopping', status: 'completed' },
+  { merchant: 'Caltex Epping', daysAgo: 2, amount: -66.80, category: 'transport', status: 'completed' },
+  { merchant: 'AGL Energy', daysAgo: 3, amount: -189.00, category: 'bills', status: 'completed' },
+  { merchant: "Grill'd Carlton", daysAgo: 4, amount: -28.70, category: 'dining', status: 'completed' },
+  { merchant: 'Netflix Australia', daysAgo: 5, amount: -22.99, category: 'entertainment', status: 'completed' },
+  { merchant: 'Chemist Warehouse', daysAgo: 5, amount: -34.50, category: 'other', status: 'completed' },
+  { merchant: 'Woolworths Doncaster', daysAgo: 6, amount: -68.40, category: 'shopping', status: 'completed' },
+  { merchant: 'JB Hi-Fi', daysAgo: 7, amount: -249.00, category: 'shopping', status: 'pending' },
+  { merchant: 'Bunnings Warehouse', daysAgo: 8, amount: -112.35, category: 'shopping', status: 'completed' },
+  { merchant: 'Kmart Doncaster', daysAgo: 9, amount: -53.20, category: 'shopping', status: 'completed' },
+  { merchant: 'The Coffee Club', daysAgo: 10, amount: -7.90, category: 'dining', status: 'completed' },
+  { merchant: 'Ampol Northcote', daysAgo: 11, amount: -61.45, category: 'transport', status: 'completed' },
+  { merchant: 'Spotify', daysAgo: 12, amount: -13.99, category: 'entertainment', status: 'completed' },
+  { merchant: 'Woolworths Metro CBD', daysAgo: 13, amount: -81.35, category: 'shopping', status: 'completed' },
+  { merchant: 'Salary Credit - Common Origin Pty', daysAgo: 14, amount: 4250.00, category: 'other', status: 'completed' },
+  { merchant: 'Uber', daysAgo: 15, amount: -24.85, category: 'transport', status: 'completed' },
+  { merchant: 'Telstra', daysAgo: 16, amount: -139.00, category: 'bills', status: 'completed' },
+  { merchant: 'Coles Richmond', daysAgo: 17, amount: -72.10, category: 'shopping', status: 'completed' },
+  { merchant: 'Officeworks Richmond', daysAgo: 18, amount: -46.80, category: 'shopping', status: 'failed' },
+  { merchant: 'Uber Eats', daysAgo: 19, amount: -33.45, category: 'dining', status: 'completed' },
+  { merchant: 'AGL Energy', daysAgo: 20, amount: -197.30, category: 'bills', status: 'completed' },
+  { merchant: 'Myki Top Up', daysAgo: 21, amount: -30.00, category: 'transport', status: 'completed' },
+  { merchant: 'Woolworths Doncaster', daysAgo: 23, amount: -74.20, category: 'shopping', status: 'completed' },
+  { merchant: 'Event Cinemas', daysAgo: 25, amount: -44.00, category: 'entertainment', status: 'completed' },
+  { merchant: 'Bunnings Warehouse', daysAgo: 27, amount: -58.30, category: 'shopping', status: 'completed' },
+  { merchant: 'The Coffee Club', daysAgo: 29, amount: -10.60, category: 'dining', status: 'completed' },
+  { merchant: 'Origin Energy', daysAgo: 31, amount: -86.50, category: 'bills', status: 'completed' },
+  { merchant: 'Woolworths Metro CBD', daysAgo: 34, amount: -88.95, category: 'shopping', status: 'completed' },
+  { merchant: 'Caltex Epping', daysAgo: 37, amount: -70.15, category: 'transport', status: 'completed' },
+  { merchant: 'Netflix Australia', daysAgo: 40, amount: -22.99, category: 'entertainment', status: 'completed' },
+  { merchant: 'Coles Fitzroy', daysAgo: 43, amount: -69.80, category: 'shopping', status: 'completed' },
+  { merchant: 'Refund - Woolworths Metro CBD', daysAgo: 46, amount: 18.20, category: 'other', status: 'completed' },
+  { merchant: 'Myki Top Up', daysAgo: 49, amount: -20.00, category: 'transport', status: 'completed' },
+  { merchant: 'AGL Energy', daysAgo: 52, amount: -192.10, category: 'bills', status: 'completed' },
+  { merchant: "Grill'd Carlton", daysAgo: 55, amount: -29.40, category: 'dining', status: 'completed' },
+  { merchant: 'Kmart Doncaster', daysAgo: 58, amount: -41.55, category: 'shopping', status: 'completed' },
+  { merchant: 'Woolworths Doncaster', daysAgo: 61, amount: -82.75, category: 'shopping', status: 'completed' },
+  { merchant: 'Telstra', daysAgo: 64, amount: -139.00, category: 'bills', status: 'completed' },
+  { merchant: 'Uber', daysAgo: 67, amount: -22.40, category: 'transport', status: 'completed' },
+  { merchant: 'JB Hi-Fi', daysAgo: 70, amount: -119.00, category: 'shopping', status: 'completed' },
+  { merchant: 'The Coffee Club', daysAgo: 73, amount: -8.80, category: 'dining', status: 'completed' },
+  { merchant: 'Salary Credit - Common Origin Pty', daysAgo: 76, amount: 4250.00, category: 'other', status: 'completed' },
+  { merchant: 'Bunnings Warehouse', daysAgo: 79, amount: -96.25, category: 'shopping', status: 'completed' },
+  { merchant: 'Officeworks Richmond', daysAgo: 82, amount: -28.90, category: 'shopping', status: 'completed' },
+  { merchant: 'Origin Energy', daysAgo: 85, amount: -83.10, category: 'bills', status: 'completed' },
+  { merchant: 'Event Cinemas', daysAgo: 88, amount: -36.00, category: 'entertainment', status: 'completed' },
 ];
+
+const MOCK_TRANSACTIONS = MOCK_TRANSACTION_SEED.map((transaction, index) => ({
+  id: `tx${index + 1}`,
+  merchant: transaction.merchant,
+  date: getRelativeISODate(transaction.daysAgo),
+  amount: transaction.amount,
+  category: transaction.category,
+  status: transaction.status,
+}));
 
 /** v0.9: createSurface is always the first message */
 function generateCreateSurface(): A2UIMessage {

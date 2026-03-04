@@ -342,7 +342,7 @@
         "label": { "$ref": "#/$defs/stringOrPath", "description": "Button label text." },
         "variant": {
           "type": "string",
-          "enum": ["primary", "secondary", "ghost", "danger"]
+          "enum": ["primary", "secondary", "naked", "emphasis", "danger"]
         },
         "size": {
           "type": "string",

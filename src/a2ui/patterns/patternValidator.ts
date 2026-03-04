@@ -14,11 +14,16 @@
  */
 
 import { ALL_PATTERNS, getPattern } from './definitions';
+import { GLOBAL_RHYTHM_RULES } from './rhythmRules';
 import type {
   PatternDefinition,
   PatternValidationResult,
   PatternDetectionResult,
+  RhythmContext,
+  RhythmRule,
+  RhythmViolation,
 } from './types';
+import type { ComponentNode } from '../types';
 
 /**
  * Extract the unique list of component type names from an array of component
@@ -29,7 +34,7 @@ import type {
  *  - A plain string array (component type names directly)
  */
 export function extractComponentTypes(
-  components: Array<{ component: string } | string>
+  components: Array<{ component: string; [key: string]: unknown } | string>
 ): string[] {
   const types = components.map((c) =>
     typeof c === 'string' ? c : c.component
@@ -37,16 +42,87 @@ export function extractComponentTypes(
   return [...new Set(types)];
 }
 
+// ---------------------------------------------------------------------------
+// Rhythm context builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a RhythmContext from the flat component list of a surface.
+ * The context is a lightweight tree-traversal helper used by RhythmRule checks.
+ *
+ * Cost: O(n) where n = number of nodes.
+ */
+export function buildRhythmContext(nodes: ComponentNode[]): RhythmContext {
+  const nodesById = new Map(nodes.map((n) => [n.id, n]));
+  const parentId = new Map<string, string>();
+
+  for (const node of nodes) {
+    for (const childId of node.children ?? []) {
+      parentId.set(childId, node.id);
+    }
+  }
+
+  const childrenOf = (id: string): ComponentNode[] =>
+    (nodesById.get(id)?.children ?? [])
+      .map((cid) => nodesById.get(cid))
+      .filter((n): n is ComponentNode => n !== undefined);
+
+  const siblingsOf = (id: string): ComponentNode[] => {
+    const pid = parentId.get(id);
+    if (!pid) return [];
+    return childrenOf(pid).filter((n) => n.id !== id);
+  };
+
+  return { nodesById, parentId, childrenOf, siblingsOf };
+}
+
+// ---------------------------------------------------------------------------
+// Rhythm rule runner
+// ---------------------------------------------------------------------------
+
+/**
+ * Run the global visual rhythm rules (and any extra rules provided) against a
+ * flat component node list and return the list of violations found.
+ *
+ * Violations are non-blocking warnings — they do not affect `valid` on
+ * PatternValidationResult but should be logged/surfaced to aid agent tuning.
+ *
+ * @param nodes          - Full flat component list for the surface.
+ * @param additionalRules - Per-pattern or per-scenario rhythm rules to add
+ *                          to the global set (e.g. from PatternDefinition.rhythmRules).
+ */
+export function checkRhythm(
+  nodes: ComponentNode[],
+  additionalRules: RhythmRule[] = []
+): RhythmViolation[] {
+  if (nodes.length === 0) return [];
+
+  const ctx = buildRhythmContext(nodes);
+  const allRules = [...GLOBAL_RHYTHM_RULES, ...additionalRules];
+  const violations: RhythmViolation[] = [];
+
+  for (const rule of allRules) {
+    const messages = rule.check(nodes, ctx);
+    if (messages.length > 0) {
+      violations.push({ ruleId: rule.id, description: rule.description, messages });
+    }
+  }
+
+  return violations;
+}
+
 /**
  * Validate a surface against a specific registered pattern.
  *
- * @param patternId - The pattern ID to validate against (e.g. 'confirmation-flow')
+ * @param patternId      - The pattern ID to validate against (e.g. 'confirmation-flow')
  * @param componentTypes - Unique component type strings present on the surface
+ * @param nodes          - Optional full node list; when provided, rhythm rules are also run
  * @returns PatternValidationResult
  */
 export function validatePattern(
   patternId: string,
-  componentTypes: string[]
+  componentTypes: string[],
+  nodes?: ComponentNode[]
 ): PatternValidationResult {
   const pattern = getPattern(patternId);
 
@@ -57,6 +133,7 @@ export function validatePattern(
       missingComponents: [],
       failedRules: [`Unknown pattern: "${patternId}"`],
       detectedStates: [],
+      rhythmViolations: [],
     };
   }
 
@@ -70,12 +147,17 @@ export function validatePattern(
 
   const detectedStates = detectStates(pattern, componentTypes);
 
+  const rhythmViolations = nodes
+    ? checkRhythm(nodes, pattern.rhythmRules ?? [])
+    : [];
+
   return {
     patternId,
     valid: missingComponents.length === 0 && failedRules.length === 0,
     missingComponents,
     failedRules,
     detectedStates,
+    rhythmViolations,
   };
 }
 

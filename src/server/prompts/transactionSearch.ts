@@ -22,7 +22,9 @@ The customer is Sarah Chen. She has:
 - Goal Saver (••••4567) — $12,450.00
 - Platinum Credit Card (••••2103) — owing $1,892.40
 
-Use realistic Australian merchants and amounts. Dates should be close to the current date (February 2026). Use a mix of completed, pending, and occasional failed transactions for realism.
+Use realistic Australian merchants and amounts. Dates must be recent relative to TODAY (not fixed historical dates). Use a mix of completed, pending, and occasional failed transactions for realism.
+
+Assume a stable demo ledger covering the last 90 days with regular weekly activity.
 
 # AVAILABLE COMPONENTS (use only these — v0.9 flat format)
 
@@ -48,7 +50,7 @@ Use realistic Australian merchants and amounts. Dates should be close to the cur
 {"id":"x","component":"EmptyState","illustration":"search","title":"No results","description":"Try different terms"}
 
 ## Button — Action button (use action with name + context)
-{"id":"x","component":"Button","label":"Label","variant":"primary"|"secondary"|"text","action":{"name":"action_name","context":[{"key":"field","value":"value"}]}}
+{"id":"x","component":"Button","label":"Label","variant":"primary"|"secondary"|"naked","action":{"name":"action_name","context":[{"key":"field","value":"value"}]}}
 
 ## StatusBadge — Transaction status
 {"id":"x","component":"StatusBadge","status":"completed"|"pending"|"failed","size":"medium"}
@@ -75,6 +77,11 @@ Use realistic Australian merchants and amounts. Dates should be close to the cur
 6. When you receive action "back_to_list", regenerate the original search results.
 7. When you receive action "dispute_transaction", show a dispute confirmation form.
 8. Filter chips should be interactive: bind "selected" to data model and use local "onClick" with "eventType" + "dataPath".
+9. For any "recent" or "last 7 days" view, include at least 5 transactions dated within the last 7 days.
+10. Ensure outputs are consistent with a realistic 90-day transaction history (not just a handful of isolated records).
+11. In follow-up turns, preserve previously shown transaction details unless the user asks to change filters.
+
+Treat example JSON below as SHAPE ONLY. Do not copy literal dates from examples; always emit fresh dates relative to today.
 
 # EXAMPLE 1 — Search results
 
@@ -89,7 +96,7 @@ User: "Show my Woolworths transactions"
 User: 'The user performed action "view_transaction" with the following details: merchant: Woolworths Metro CBD, amount: -87.43, date: 2026-02-17, category: shopping, status: completed'
 
 {"createSurface":{"surfaceId":"main","catalogId":"${CATALOG_ID}"}}
-{"updateComponents":{"surfaceId":"main","components":[{"id":"root","component":"Stack","direction":"column","gap":"lg","children":["back-btn","detail-header","amount-display","detail-card","actions"]},{"id":"back-btn","component":"Button","label":"← Back to transactions","variant":"text","action":{"name":"back_to_list","context":[]}},{"id":"detail-header","component":"Stack","direction":"column","gap":"xs","children":["merchant-name","tx-date","tx-status"]},{"id":"merchant-name","component":"Text","text":"Woolworths Metro CBD","variant":"h1"},{"id":"tx-date","component":"Text","text":"Monday, 17 February 2026","variant":"body"},{"id":"tx-status","component":"StatusBadge","status":"completed","size":"medium"},{"id":"amount-display","component":"MoneyDisplay","amount":-87.43,"currency":"AUD","size":"large","weight":"bold"},{"id":"detail-card","component":"Stack","direction":"column","gap":"md","children":["detail-account","detail-category","detail-ref"]},{"id":"detail-account","component":"Text","text":"From: Everyday Account (••••7890)","variant":"body"},{"id":"detail-category","component":"Text","text":"Category: Shopping","variant":"body"},{"id":"detail-ref","component":"Text","text":"Reference: TXN-20260217-4532","variant":"caption"},{"id":"actions","component":"Stack","direction":"row","gap":"sm","children":["dispute-btn","receipt-btn"]},{"id":"dispute-btn","component":"Button","label":"Dispute transaction","variant":"secondary","action":{"name":"dispute_transaction","context":[{"key":"merchant","value":"Woolworths Metro CBD"},{"key":"amount","value":-87.43},{"key":"date","value":"2026-02-17"},{"key":"reference","value":"TXN-20260217-4532"}]}},{"id":"receipt-btn","component":"Button","label":"Request receipt","variant":"text","action":{"name":"request_receipt","context":[{"key":"reference","value":"TXN-20260217-4532"}]}}]}}
+{"updateComponents":{"surfaceId":"main","components":[{"id":"root","component":"Stack","direction":"column","gap":"lg","children":["back-btn","detail-header","amount-display","detail-card","actions"]},{"id":"back-btn","component":"Button","label":"← Back to transactions","variant":"naked","action":{"name":"back_to_list","context":[]}},{"id":"detail-header","component":"Stack","direction":"column","gap":"xs","children":["merchant-name","tx-date","tx-status"]},{"id":"merchant-name","component":"Text","text":"Woolworths Metro CBD","variant":"h1"},{"id":"tx-date","component":"Text","text":"Monday, 17 February 2026","variant":"body"},{"id":"tx-status","component":"StatusBadge","status":"completed","size":"medium"},{"id":"amount-display","component":"MoneyDisplay","amount":-87.43,"currency":"AUD","size":"large","weight":"bold"},{"id":"detail-card","component":"Stack","direction":"column","gap":"md","children":["detail-account","detail-category","detail-ref"]},{"id":"detail-account","component":"Text","text":"From: Everyday Account (••••7890)","variant":"body"},{"id":"detail-category","component":"Text","text":"Category: Shopping","variant":"body"},{"id":"detail-ref","component":"Text","text":"Reference: TXN-20260217-4532","variant":"caption"},{"id":"actions","component":"Stack","direction":"row","gap":"sm","children":["dispute-btn","receipt-btn"]},{"id":"dispute-btn","component":"Button","label":"Dispute transaction","variant":"secondary","action":{"name":"dispute_transaction","context":[{"key":"merchant","value":"Woolworths Metro CBD"},{"key":"amount","value":-87.43},{"key":"date","value":"2026-02-17"},{"key":"reference","value":"TXN-20260217-4532"}]}},{"id":"receipt-btn","component":"Button","label":"Request receipt","variant":"naked","action":{"name":"request_receipt","context":[{"key":"reference","value":"TXN-20260217-4532"}]}}]}}
 
 # EXAMPLE 3 — Recent transactions (no specific merchant)
 

@@ -562,9 +562,13 @@ export function renderNode(
         handleClick = () => onAction?.(action);
       }
       
+      const VALID_BUTTON_VARIANTS = ['primary', 'secondary', 'naked', 'emphasis', 'danger'] as const;
+      const rawVariant = node.variant as string | undefined;
+      const safeVariant: typeof VALID_BUTTON_VARIANTS[number] =
+        VALID_BUTTON_VARIANTS.includes(rawVariant as any) ? rawVariant as any : 'primary';
       return React.createElement(Button, {
         key: id,
-        variant: node.variant || 'primary',
+        variant: safeVariant,
         size: node.size || 'medium',
         disabled: node.disabled || false,
         onClick: handleClick,

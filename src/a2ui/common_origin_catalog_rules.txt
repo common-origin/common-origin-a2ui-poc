@@ -37,16 +37,46 @@
 - For list-style interactive components (for example ListItem, TransactionListItem), use 'onClick' with the same v0.9 shape: { "name": "actionName", "context": [...] }.
 - For form controls (TextField, NumberField, Select, Checkbox), use local onChange with 'eventType' + 'dataPath' to update the local data model.
 
+**VISUAL RHYTHM:**
+Apply these layout rules to EVERY surface you generate. They ensure consistent spacing, element order, and sizing across all patterns.
+
+Spacing tokens (use these values for the 'gap' prop on every Stack):
+- "xs" —  4 px — icon rows, inline chip groups
+- "sm" —  8 px — tight label/value pairs, button rows
+- "md" — 16 px — form fields, card sections ← default when unsure
+- "lg" — 24 px — between logical sections on a page
+- "xl" — 32 px — top-level full-page sections
+
+Rules (enforced in order):
+1. Every Stack MUST have a 'gap' prop — use "md" if nothing more specific applies.
+2. Heading Text (variant h1/h2/h3/heading/title) MUST be the first child of its Stack.
+3. Input fields (TextField, NumberField, Select, Checkbox, SearchField) MUST be direct children of a Stack — never at root level or inside a non-layout component.
+4. In a form Stack, ALL input fields come first; ALL action Buttons come after — never interleave.
+5. In a form Stack containing inputs, use direction="column" and gap="md".
+6. In a Stack containing only BooleanChip / FilterChip, use direction="row" and gap="xs".
+7. When a Stack contains two or more Buttons, ALL Buttons must share the same 'size' prop.
+8. In any Button group, the secondary/cancel/back Button comes FIRST; the primary/confirm/continue Button comes LAST.
+9. Disambiguation option Buttons must stack vertically (direction="column") — never side-by-side in a row.
+
 **PATTERNS:**
 Use the following named patterns to structure your UI. Each pattern defines required components, layout rules, and interaction flows.
 
-- account-summary: Requires AccountCard + Stack. Show a MoneyDisplay total. Each AccountCard must have an onClick action.
-- transaction-list: When showing results, EVERY TransactionListItem must be wrapped in a DateGroup and have an onClick "view_transaction" action. Show EmptyState when there are no results.
-- spending-breakdown: Requires CategoryBadge + MoneyDisplay + Stack. List categories highest-spend first with a MoneyDisplay per category.
-- progressive-input: Requires at least one of TextField, NumberField, Select, or Checkbox, plus a primary Button to advance the flow. Always include a cancel/back Button.
-- confirmation-flow: Three states — review (summary Card + confirm Button + edit Button), success (Alert + reference number), error (Alert + retry Button).
-- search-and-filter: Requires SearchField at the top. Use BooleanChip for filters. Show EmptyState with illustration="search" when no results.
-- detail-drilldown: Detail view must have a back Button (action "back_to_list") and wrap content in a Card.
-- disambiguation: Show a Text question + two or more Button options when user intent is ambiguous.
-- progressive-disclosure: Use when you need one piece of additional context — brief Alert/Text explaining what's needed, 2-3 Button options.
-- agentic-consent: Required for destructive actions — warning Alert + confirm Button + cancel Button (cancel must never be styled as 'text' variant).
+- account-summary: Requires AccountCard + Stack. Show a MoneyDisplay total at the top. Place quick-action Buttons (Transfer, View spending, Search) at the bottom in a Stack with gap="sm" and direction="row". All Buttons in the action row must share the same size prop. Each AccountCard must have an onClick action.
+
+- transaction-list: When showing results, EVERY TransactionListItem must be wrapped in a DateGroup and have an onClick "view_transaction" action. Group by date, most-recent first. Show a summary line (e.g. "8 transactions · $423.50 total"). Show EmptyState (not an empty list) when there are no results.
+
+- spending-breakdown: Requires CategoryBadge + MoneyDisplay + Stack. Show a total MoneyDisplay at the top. Wrap the category list in a Stack with gap="md". List categories highest-spend first. Include a comparison Alert if spend is unusual vs prior period.
+
+- progressive-input: Requires at least one of TextField, NumberField, Select, or Checkbox, plus a primary Button to advance the flow. Wrap all inputs in a Stack with direction="column" and gap="md". Place ALL Buttons AFTER ALL inputs at the bottom. Secondary cancel/back Button comes before primary continue/review Button. Both Buttons must share the same size prop. Show constraint Alerts (e.g. available balance) above the inputs.
+
+- confirmation-flow: Three states — review (summary Card + Buttons after the Card, secondary "Back" first then primary "Confirm" last, same size, gap="sm" row), success (Alert + reference number REF-YYYYMMDD-xxxx + "Make another" and "View account" Buttons), error (Alert + plain-language explanation + retry Button).
+
+- search-and-filter: Requires SearchField at the top. Place BooleanChip filter chips in a Stack with direction="row" and gap="xs" below the SearchField. Show EmptyState with illustration="search" when no results. Show a result count summary (e.g. "5 results") below the filters.
+
+- detail-drilldown: Detail view must have a back Button (action "back_to_list") at the top. Wrap detail content in a Card. Show a MoneyDisplay for the primary amount. Include a StatusBadge and relevant metadata. Offer contextual actions at the bottom.
+
+- disambiguation: Show a Text question ("Which did you mean?"). Render each option as a full-width Button in a Stack with direction="column" and gap="sm". Never put option Buttons side-by-side in a row. Each Button action must carry enough context to proceed without re-asking.
+
+- progressive-disclosure: Use when you need ONE additional piece of context before proceeding. Show a brief Alert or Text explaining what is needed. Offer 2-3 common options as Buttons, plus a TextField for free input if relevant. Never ask for more than one missing item at a time.
+
+- agentic-consent: Required for destructive or irreversible actions. Show a warning Alert with a plain-language description of exactly what will happen. Require explicit confirmation with a clearly labelled confirm Button. The cancel Button must be equally prominent — never styled as 'text' or 'ghost' variant.

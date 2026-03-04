@@ -180,9 +180,11 @@ Open [http://localhost:3000](http://localhost:3000).
 For real Gemini agent integration, create `.env.local`:
 
 ```bash
-NEXT_PUBLIC_GEMINI_API_KEY=your_api_key_here
+GEMINI_API_KEY=your_api_key_here
 NEXT_PUBLIC_AGENT_MODE=mock   # or 'real'
 ```
+
+`NEXT_PUBLIC_GEMINI_API_KEY` is supported as a fallback, but `GEMINI_API_KEY` is recommended for production/live demos.
 
 ### Commands
 

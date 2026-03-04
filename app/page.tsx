@@ -9,7 +9,7 @@
  * - All components come from trusted catalog
  */
 
-import { useState, useCallback, useEffect, type ComponentType } from 'react';
+import { useState, useCallback, type ComponentType } from 'react';
 import { A2UISurface, useA2UISurface } from '@/src/components/A2UISurface';
 import { A2UIErrorBoundary } from '@/src/components/A2UIErrorBoundary';
 import { callAgent, getAgentMode, type ConversationTurn } from '@/src/lib/agentClient';

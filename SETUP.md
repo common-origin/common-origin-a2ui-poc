@@ -27,8 +27,10 @@ cp .env.local.example .env.local
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NEXT_PUBLIC_GEMINI_API_KEY` | Google Gemini API key (for real agent mode) | — |
+| `GEMINI_API_KEY` | Google Gemini API key (for real agent mode, server-side preferred) | — |
 | `NEXT_PUBLIC_AGENT_MODE` | `mock` or `real` | `mock` |
+
+`NEXT_PUBLIC_GEMINI_API_KEY` is also accepted as a fallback for compatibility, but `GEMINI_API_KEY` is recommended for live demos.
 
 To get a Gemini API key, visit [Google AI Studio](https://aistudio.google.com/app/apikey).
 

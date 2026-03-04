@@ -15,8 +15,12 @@ import type { NextRequest } from 'next/server';
 
 const log = createLogger('APIRoute');
 
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+const IS_GEMINI_KEY_CONFIGURED =
+  GEMINI_API_KEY.length > 0 && GEMINI_API_KEY !== 'your_gemini_api_key_here';
+
 // Initialize Gemini AI client
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 // Model configuration
 const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
@@ -52,15 +56,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate API key is configured
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
+    if (!IS_GEMINI_KEY_CONFIGURED) {
       log.error('GEMINI_API_KEY not configured');
       return new Response(
         JSON.stringify({
           error: 'Agent not configured',
-          message: 'GEMINI_API_KEY environment variable is not set. Please add your API key to .env.local',
+          message: 'Gemini API key is not set. Add GEMINI_API_KEY to .env.local (NEXT_PUBLIC_GEMINI_API_KEY is supported as fallback).',
         }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    if (!process.env.GEMINI_API_KEY && process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+      log.warn('Using NEXT_PUBLIC_GEMINI_API_KEY fallback; prefer GEMINI_API_KEY for server-only usage');
     }
 
     // Get the Gemini model with scenario-specific + preferences prompt
@@ -241,9 +249,7 @@ export async function POST(request: NextRequest) {
  * Health check endpoint
  */
 export async function GET() {
-  const isConfigured =
-    !!process.env.GEMINI_API_KEY &&
-    process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here';
+  const isConfigured = IS_GEMINI_KEY_CONFIGURED;
 
   return Response.json({
     status: 'ok',

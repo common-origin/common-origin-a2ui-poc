@@ -1,3 +1,5 @@
+import type { ComponentNode } from '../types';
+
 /**
  * Pattern Definition Types — A2UI Pattern Layer
  *
@@ -34,6 +36,56 @@ export interface PatternRule {
    * Returns true if the rule passes.
    */
   check: (componentTypes: string[]) => boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Rhythm rules — visual consistency checks that operate on the full tree
+// ---------------------------------------------------------------------------
+
+/**
+ * Tree-traversal helper passed to every RhythmRule.check call.
+ * Build once per surface via buildRhythmContext() in patternValidator.ts.
+ */
+export interface RhythmContext {
+  /** All component nodes keyed by id. */
+  nodesById: Map<string, ComponentNode>;
+  /** Maps each node id to its parent's id (undefined for root-level nodes). */
+  parentId: Map<string, string>;
+  /** Returns the resolved child ComponentNodes of the given node id. */
+  childrenOf: (id: string) => ComponentNode[];
+  /** Returns the sibling ComponentNodes that share the same parent. */
+  siblingsOf: (id: string) => ComponentNode[];
+}
+
+/**
+ * A layout/visual-consistency rule that can inspect component props and
+ * tree relationships — not just component type presence.
+ *
+ * Returning an empty array means the rule passes.
+ * Returning one or more strings means those violations were found.
+ */
+export interface RhythmRule {
+  /** Unique slug for this rule, used in violation reports. */
+  id: string;
+  /** One-line description of what this rule enforces. */
+  description: string;
+  /**
+   * Checker function.
+   * @param nodes - Full flat component list for the surface.
+   * @param ctx   - Tree-traversal helper (parent map, child lookups, etc.).
+   * @returns Array of human-readable violation messages (empty = pass).
+   */
+  check: (nodes: ComponentNode[], ctx: RhythmContext) => string[];
+}
+
+/** A single rhythm rule violation recorded during surface validation. */
+export interface RhythmViolation {
+  /** ID of the RhythmRule that fired. */
+  ruleId: string;
+  /** Human-readable rule description. */
+  description: string;
+  /** Specific messages explaining what was wrong and which components are affected. */
+  messages: string[];
 }
 
 /** A named state within a pattern's interaction lifecycle. */
@@ -92,6 +144,13 @@ export interface PatternDefinition {
   validationRules: PatternRule[];
 
   /**
+   * Per-pattern rhythm rules — layout/visual-consistency checks specific to
+   * this pattern that supplement the global GLOBAL_RHYTHM_RULES.
+   * Optional: patterns without special layout requirements omit this.
+   */
+  rhythmRules?: RhythmRule[];
+
+  /**
    * Compact agent guidance injected into system prompts.
    * Written as directive prose (imperative, concise).
    */
@@ -117,6 +176,8 @@ export interface PatternValidationResult {
   failedRules: string[];
   /** States detected as active. */
   detectedStates: string[];
+  /** Visual rhythm violations found — non-blocking warnings for layout consistency. */
+  rhythmViolations: RhythmViolation[];
 }
 
 export interface PatternDetectionResult {
