@@ -18,6 +18,7 @@ import { analyzeQuery } from '@/src/server/queryRouter';
 import { CATALOG_ID } from '@/src/a2ui/catalog';
 import { createLogger } from '@/src/lib/logger';
 import type { UserActionMessage } from '@/src/a2ui/types';
+import { AboutSheet } from '@/src/components/AboutSheet';
 import styled from 'styled-components';
 import * as CommonOriginDesignSystem from '@common-origin/design-system';
 import {
@@ -113,6 +114,9 @@ const TopRightControls = styled.div`
   top: 1rem;
   right: 1.25rem;
   z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 `;
 
 const SurfaceContainer = styled.main<{ $visible: boolean }>`
@@ -183,6 +187,7 @@ export default function Home() {
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [agentMode] = useState<'mock' | 'real'>(getAgentMode());
   const [conversationHistory, setConversationHistory] = useState<ConversationTurn[]>([]);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const { sendMessage } = useA2UISurface('main');
 
   const handleSubmit = async (userQuery?: string) => {
@@ -367,10 +372,14 @@ export default function Home() {
     <PageWrapper>
       {/* Future: browsing-token personalisation hook point — see STRATEGY.md */}
       <TopRightControls>
+        <Button variant="naked" size="small" onClick={() => setIsAboutOpen(true)} aria-label="About this project">
+          About
+        </Button>
         <Button variant="naked" size="small" onClick={() => {}} aria-label="Preferences (coming soon)">
           Preferences
         </Button>
       </TopRightControls>
+      <AboutSheet isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
       <PageContainer>
         {/* Query Input */}
         <InputStage $hasSubmitted={hasSubmitted}>
